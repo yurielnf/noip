@@ -12,7 +12,7 @@ class IRLM
 public:
     arma::mat tmat, Pmat;
     double U;
-    double tol=1e-10;
+    double tol=1e-14;
 
     itensor::Fermion sites;
 
@@ -39,7 +39,7 @@ public:
             for(auto j : itensor::range1(L))
         {
             if (fabs(tmat(i-1,j-1))<tol) continue;
-            ampo += -tmat(i-1,j-1),"Cdag",i,"C",j;
+            ampo += tmat(i-1,j-1),"Cdag",i,"C",j;
         }
 
         //interaction
@@ -48,7 +48,7 @@ public:
                 for(auto c : itensor::range1(L))
                     for(auto d : itensor::range1(L)) {
                         double coeff=U*Pmat(0,a-1)*Pmat(1,b-1)*Pmat(1,c-1)*Pmat(0,d-1);
-                        if (c==d || a==b || fabs(coeff)<1e-6) continue;
+                        if (c==d || a==b || fabs(coeff)<tol) continue;
                         ampo += coeff,"Cdag",a,"Cdag",b,"C",c,"C",d;
                     }
         }
@@ -63,7 +63,7 @@ public:
         return itensor::randomMPS(state);
     }
 
-    double cicj(itensor::MPS psi,int i,int j)
+    double cicj(itensor::MPS& psi,int i,int j)
     {
         auto Adag_i = op(sites,"Adag",i);
         auto A_j = op(sites,"A",j);
@@ -91,6 +91,37 @@ public:
         Cij *= psidag(j);
 
         return elt(Cij); //or eltC(Cij) if expecting complex
+    }
+
+    arma::mat cicj(itensor::MPS& psi) const
+    {
+        arma::mat cc(length(),length());
+        for(auto i : itensor::range1(length())) {
+            auto Adag_i = op(sites,"Adag",i);
+            psi.position(i);
+            auto psidag = dag(psi);
+            psidag.prime();
+            //index linking i to i-1:
+            auto li_1 = leftLinkIndex(psi,i);
+            auto Cij = prime(psi(i),li_1)*Adag_i*psidag(i);
+            for(auto j : itensor::range1(i+1,length())) {
+                auto A_j = op(sites,"A",j);
+                for(int k = i+1; k < j; ++k)
+                {
+                    Cij *= psi(k);
+                    Cij *= op(sites,"F",k); //Jordan-Wigner string
+                    Cij *= psidag(k);
+                }
+                //index linking j to j+1:
+                auto lj = rightLinkIndex(psi,j);
+                Cij *= prime(psi(j),lj);
+                Cij *= A_j;
+                Cij *= psidag(j);
+
+                cc(i-1,j-1)=cc(j-1,i-1)=elt(Cij);
+            }
+        }
+        return cc;
     }
 };
 

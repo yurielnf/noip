@@ -3,16 +3,17 @@
 using namespace itensor;
 
 int 
-main()
+main(int argc, char* argv[])
 {
-    auto sweeps = Sweeps(5); //number of sweeps is 5
-    sweeps.maxdim() = 10,20,100,100,200;
-    sweeps.cutoff() = 1E-10;
-    sweeps.niter() = 2,2,2,2,10;
-    auto sys=IRLM("","",-0.5);
-    auto [energy,psi] = dmrg(sys.Ham(),sys.psi0(),sweeps,"Quiet");
+    if (argc!=4) { cout<<"usage: <tFileName> <PFileName> <U>"; return 0; }
+    auto sweeps = Sweeps(10); //number of sweeps is 5
+    sweeps.maxdim() = 10,20,100,100,200,300;
+    sweeps.cutoff() = 1E-14;
+    sweeps.niter() = 2,2,2,2,20;
+    auto sol=IRLM(argv[1], argv[2], atof(argv[3]));
+    auto [energy,psi] = dmrg(sol.Ham(),sol.psi0(),sweeps,"Quiet");
 
-    std::cout<<"<ci cj>="<<sys.cicj(psi,5,10) << "\n";
+    sol.cicj(psi).print("cicj=");
 
     return 0;
 }
