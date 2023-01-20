@@ -13,24 +13,34 @@ public:
     arma::mat tmat, Pmat;
     double U;
     double tol=1e-14;
+    bool use_saved_ham;
+    char ham_file_name[20]="ham.bin";
 
     itensor::Fermion sites;
 
-    IRLM(string tFile,string PFile, double U_)
-        :U(U_)
+    IRLM(string tFile,string PFile, double U_, bool use_saved_ham_=false)
+        :U(U_), use_saved_ham(use_saved_ham_)
     {
         tmat.load(tFile);
         Pmat.load(PFile);
 
         cout<<"P*P.t()-1 = "<< arma::norm(Pmat*Pmat.t()-arma::mat(length(),length(), arma::fill::eye)) << endl;
 
-        sites=itensor::Fermion(length());
+        if (use_saved_ham)
+            itensor::readFromFile("sites.bin",sites);
+        else
+            sites=itensor::Fermion(length());
     }
 
     int length() const { return tmat.n_rows; }
 
     itensor::MPO Ham() const
     {
+        if (use_saved_ham) {
+            itensor::MPO ham(sites);
+            itensor::readFromFile(ham_file_name,ham);
+            return ham;
+        }
         auto L=length();
         auto ampo = itensor::AutoMPO(sites);
 
@@ -48,11 +58,14 @@ public:
                 for(auto c : itensor::range1(L))
                     for(auto d : itensor::range1(L)) {
                         double coeff=U*Pmat(0,a-1)*Pmat(1,b-1)*Pmat(1,c-1)*Pmat(0,d-1);
-                        if (c==d || a==b || fabs(coeff)<tol) continue;
+                        if (c==d || a==b) continue;
                         ampo += coeff,"Cdag",a,"Cdag",b,"C",c,"C",d;
                     }
         }
-        return toMPO(ampo);
+        auto ham=toMPO(ampo);
+        itensor::writeToFile("sites.bin",sites);
+        itensor::writeToFile(ham_file_name,ham);
+        return ham;
     }
 
     itensor::MPS psi0() const
@@ -96,15 +109,20 @@ public:
     arma::mat cicj(itensor::MPS& psi) const
     {
         arma::mat cc(length(),length());
+
         for(auto i : itensor::range1(length())) {
-            auto Adag_i = op(sites,"Adag",i);
             psi.position(i);
             auto psidag = dag(psi);
             psidag.prime();
-            //index linking i to i-1:
             auto li_1 = leftLinkIndex(psi,i);
-            auto Cij = prime(psi(i),li_1)*Adag_i*psidag(i);
+
+            auto n_i = op(sites,"N",i);
+            cc(i-1,i-1)=elt(dag(prime(psi(i),"Site"))*n_i*psi(i));
+
+            auto Adag_i = op(sites,"Adag",i);
+            auto Cij0 = prime(psi(i),li_1)*Adag_i*psidag(i);
             for(auto j : itensor::range1(i+1,length())) {
+                auto Cij=Cij0;
                 auto A_j = op(sites,"A",j);
                 for(int k = i+1; k < j; ++k)
                 {
