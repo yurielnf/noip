@@ -15,6 +15,7 @@ public:
     double tol=1e-14;
     bool use_saved_ham;
     char ham_file_name[20]="ham.bin";
+    char sites_file_name[20]="sites.bin";
 
     itensor::Fermion sites;
 
@@ -24,10 +25,8 @@ public:
         tmat.load(tFile);
         Pmat.load(PFile);
 
-        cout<<"P*P.t()-1 = "<< arma::norm(Pmat*Pmat.t()-arma::mat(length(),length(), arma::fill::eye)) << endl;
-
         if (use_saved_ham)
-            itensor::readFromFile("sites.bin",sites);
+            itensor::readFromFile(sites_file_name,sites);
         else
             sites=itensor::Fermion(length());
     }
@@ -63,7 +62,7 @@ public:
                     }
         }
         auto ham=toMPO(ampo);
-        itensor::writeToFile("sites.bin",sites);
+        itensor::writeToFile(sites_file_name,sites);
         itensor::writeToFile(ham_file_name,ham);
         return ham;
     }
@@ -74,36 +73,6 @@ public:
         for( auto n : itensor::range1(length()) )
             if( n%2==0 ) state.set(n,"Occ");
         return itensor::randomMPS(state);
-    }
-
-    double cicj(itensor::MPS& psi,int i,int j)
-    {
-        auto Adag_i = op(sites,"Adag",i);
-        auto A_j = op(sites,"A",j);
-
-        //'gauge' the MPS to site i
-        //any 'position' between i and j, inclusive, would work here
-        psi.position(i);
-
-        auto psidag = dag(psi);
-        psidag.prime();
-
-        //index linking i to i-1:
-        auto li_1 = leftLinkIndex(psi,i);
-        auto Cij = prime(psi(i),li_1)*Adag_i*psidag(i);
-        for(int k = i+1; k < j; ++k)
-            {
-            Cij *= psi(k);
-            Cij *= op(sites,"F",k); //Jordan-Wigner string
-            Cij *= psidag(k);
-            }
-        //index linking j to j+1:
-        auto lj = rightLinkIndex(psi,j);
-        Cij *= prime(psi(j),lj);
-        Cij *= A_j;
-        Cij *= psidag(j);
-
-        return elt(Cij); //or eltC(Cij) if expecting complex
     }
 
     arma::mat cicj(itensor::MPS& psi) const

@@ -7,11 +7,12 @@ main(int argc, char* argv[])
 {
     if (argc!=4) { cout<<"usage: <tFileName> <PFileName> <U>"; return 0; }
     auto sweeps = Sweeps(15); //number of sweeps is 5
-    sweeps.maxdim() = 10,20,50,50,60;
-    sweeps.cutoff() = 1E-12;
-    sweeps.niter() = 2,2,2,2,2,10,10,20,20,30,50,50,100,100,200;
-//    sweeps.noise() = 1e-1,1e-2,1e-3,1e-5,1e-7,1e-8,1e-9;
-    auto sol=IRLM(argv[1], argv[2], atof(argv[3]), true);
+    sweeps.maxdim() = 10,20,50,50,62;
+    sweeps.cutoff() = 1E-15;
+    sweeps.niter() = 2,2,2,2,20,100,100,20,20,30,50,50,100,100,200;
+    sweeps.noise() = 1e-1,1e-2,1e-3,1e-5,1e-7,1e-8,1e-9;
+    auto sol=IRLM(argv[1], argv[2], atof(argv[3]), false);
+
     auto [energy,psi] = dmrg(sol.Ham(),sol.psi0(),sweeps,"Quiet");
 
     auto cc=sol.cicj(psi);
