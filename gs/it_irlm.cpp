@@ -2,8 +2,7 @@
 
 using namespace itensor;
 
-int 
-main(int argc, char* argv[])
+int  main(int argc, char* argv[])
 {
     if (argc!=4) { cout<<"usage: <tFileName> <PFileName> <U>"; return 0; }
     auto sweeps = Sweeps(15); //number of sweeps is 5
