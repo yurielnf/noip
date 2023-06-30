@@ -12,9 +12,12 @@ struct it_dmrg {
     int nsweep=0;
     double energy=0;
     HamSys hamsys;
-    itensor::MPS gs;
+    itensor::MPS psi;
 
-    it_dmrg(HamSys const& hamsys_) : hamsys(hamsys_) {}
+    it_dmrg(HamSys const& hamsys_)
+        : hamsys {hamsys_}
+        , psi {itensor::randomMPS(hamsys_.sites)}
+    {}
 
     void iterate()
     {
@@ -23,7 +26,7 @@ struct it_dmrg {
         sweeps.cutoff() = rho_cutoff;
         sweeps.niter() = nIter_diag;
         sweeps.noise() = noise;
-        energy=itensor::dmrg(gs,hamsys.ham,sweeps);
+        energy=itensor::dmrg(psi,hamsys.ham,sweeps, {"Quiet",true});
         nsweep++;
     }
 };
