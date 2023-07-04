@@ -8,7 +8,7 @@ using namespace std;
 
 int main()
 {
-    HamSys sys=IRLM {.L=20, .t=0.5, .V=0.15, .U=0.1}.HamStar();
+    HamSys sys=IRLM {.L=20, .t=0.5, .V=0.15, .U=0.1}.Ham();
 
     cout<<"bond dimensions of H:\n";
     for(int i=1; i<sys.sites.length(); i++)
@@ -22,10 +22,11 @@ int main()
     }
 
     // evolve the psi with new Hamiltonian
-    sys=IRLM {.L=20, .t=0.5, .V=0.15, .U=-0.5}.HamStar();
+    sys=IRLM {.L=20, .t=0.5, .V=0.15, .U=-0.5}.Ham();
     auto psi=sol_gs.psi.replaceSiteInds(sys.sites.inds());
     it_tdvp sol {sys, psi};
     for(auto i=0u; i<10; i++) {
+        if (i>=3) sol.noise=0;
         sol.iterate();
     }
 

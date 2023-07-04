@@ -28,8 +28,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC armadillo)
 
 ##------------ example ----------
 
-add_executable(${PROJECT_NAME}_main main.cpp)
-target_link_libraries(${PROJECT_NAME}_main ${PROJECT_NAME})
+add_subdirectory(example)
 
 ##------------ wrapper ----------
 
