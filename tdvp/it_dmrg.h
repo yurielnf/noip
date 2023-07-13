@@ -26,7 +26,7 @@ struct it_dmrg {
         sweeps.cutoff() = rho_cutoff;
         sweeps.niter() = nIter_diag;
         sweeps.noise() = noise;
-        energy=itensor::dmrg(psi,hamsys.ham,sweeps, {"Quiet",true});
+        energy=itensor::dmrg(psi,hamsys.ham,sweeps, {"Silent",true});
         nsweep++;
     }
 };

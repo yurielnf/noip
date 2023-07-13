@@ -7,11 +7,11 @@
 
 struct it_tdvp {
     int bond_dim=64;
-    int nIter_diag=10;
+    int nIter_diag=32;
     double rho_cutoff=1e-12;
-    double noise=1e-8;
+    double noise=0; //1e-8;
     std::complex<double> dt={0, 0.1};
-    bool do_normalize=false;
+    bool do_normalize=true;
     double err_goal=1e-7;
 
     int nsweep=0;
@@ -19,7 +19,7 @@ struct it_tdvp {
     HamSys hamsys;
     itensor::MPS psi;
 
-    it_tdvp(HamSys const& hamsys_, itensor::MPS const& psi_) : hamsys(hamsys_), psi(psi_) {}
+    it_tdvp(HamSys const& hamsys_, itensor::MPS const& psi_) : hamsys(hamsys_), psi(psi_) { psi.replaceSiteInds(hamsys.sites.inds()); }
 
     std::complex<double> time() const { return dt * static_cast<double>(nsweep); }
 
@@ -39,7 +39,8 @@ struct it_tdvp {
                       "Method","DensityMatrix",
                       "KrylovOrd",3,
                       "DoNormalize", do_normalize,
-                      "Quiet",true});
+                      "Quiet",true,
+                      "Silent",false});
         }
 
         // TDVP sweep
@@ -47,7 +48,8 @@ struct it_tdvp {
                       {"Truncate",true,
                        "DoNormalize", do_normalize,
                        "Quiet",true,
-                       "NumCenter",1,
+                       "Silent",true,
+                       "NumCenter",2,
                        "ErrGoal", err_goal});
 
 

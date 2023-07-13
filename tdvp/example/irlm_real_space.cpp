@@ -3,31 +3,39 @@
 #include "it_tdvp.h"
 
 #include<iostream>
+#include<iomanip>
 
 using namespace std;
 
 int main()
 {
-    HamSys sys=IRLM {.L=20, .t=0.5, .V=0.15, .U=0.1}.Ham();
-
-    cout<<"bond dimensions of H:\n";
-    for(int i=1; i<sys.sites.length(); i++)
-        cout<<rightLinkIndex(sys.ham,i).dim()<<" ";
-    cout<<endl;
+    IRLM model {.L=10, .t=0.5, .V=0.15, .U=0.1};
+    HamSys sys=model.HamStar();
+    cout<<"bond dimension of H: "<< maxLinkDim(sys.ham) << endl;
 
     // solve the gs of system
     it_dmrg sol_gs {sys};
-    for(auto i=0u; i<5; i++) {
+    sol_gs.noise=1e-3;
+    for(auto i=0u; i<3; i++) sol_gs.iterate();
+    sol_gs.noise=1e-8;
+    sol_gs.nIter_diag=32;
+    cout<<"\nsweep energy\n" << setprecision(14);
+    for(auto i=0u; i<3; i++) {
         sol_gs.iterate();
+        cout<<i+1<<" "<<sol_gs.energy<<endl;
     }
 
-    // evolve the psi with new Hamiltonian
-    sys=IRLM {.L=20, .t=0.5, .V=0.15, .U=-0.5}.Ham();
-    auto psi=sol_gs.psi.replaceSiteInds(sys.sites.inds());
-    it_tdvp sol {sys, psi};
+    cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
+
+    auto rot=model.rotStar();
+    auto sys2=IRLM {.L=10, .t=0.5, .V=0.15, .U=-0.5}.HamStar();
+    cout<<"bond dimension of H: "<< maxLinkDim(sys2.ham) << endl;
+    it_tdvp sol {sys2, sol_gs.psi};
+    sol.bond_dim=256;
+    cout<<"\nsweep energy\n";
     for(auto i=0u; i<10; i++) {
-        if (i>=3) sol.noise=0;
         sol.iterate();
+        cout<<i+1<<" "<<sol.energy<<endl;
     }
 
     return 0;
