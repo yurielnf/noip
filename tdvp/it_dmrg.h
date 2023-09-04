@@ -8,6 +8,7 @@ struct it_dmrg {
     int nIter_diag=4;
     double rho_cutoff=1e-10;
     double noise=1e-8;
+    bool silent=true;
 
     int nsweep=0;
     double energy=0;
@@ -26,7 +27,7 @@ struct it_dmrg {
         sweeps.cutoff() = rho_cutoff;
         sweeps.niter() = nIter_diag;
         sweeps.noise() = noise;
-        energy=itensor::dmrg(psi,hamsys.ham,sweeps, {"Silent",true});
+        energy=itensor::dmrg(psi,hamsys.ham,sweeps, {"Quiet", true, "Silent", silent});
         nsweep++;
     }
 };

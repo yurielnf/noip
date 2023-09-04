@@ -13,6 +13,7 @@ struct it_tdvp {
     std::complex<double> dt={0, 0.1};
     bool do_normalize=true;
     double err_goal=1e-7;
+    bool silent=true;
 
     int nsweep=0;
     double energy=0;
@@ -40,7 +41,7 @@ struct it_tdvp {
                       "KrylovOrd",3,
                       "DoNormalize", do_normalize,
                       "Quiet",true,
-                      "Silent",false});
+                      "Silent",silent});
         }
 
         // TDVP sweep
@@ -48,7 +49,7 @@ struct it_tdvp {
                       {"Truncate",true,
                        "DoNormalize", do_normalize,
                        "Quiet",true,
-                       "Silent",true,
+                       "Silent",silent,
                        "NumCenter",2,
                        "ErrGoal", err_goal});
 
