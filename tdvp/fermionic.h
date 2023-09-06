@@ -17,7 +17,7 @@ struct Fermionic {
     arma::mat Rot;
 
 
-    Fermionic(arma::mat const& Kmat_, arma::mat const& Umat_, std::map<std::array<int,4>, double> const& Vijkl_={})
+    explicit Fermionic(arma::mat const& Kmat_, arma::mat const& Umat_={}, std::map<std::array<int,4>, double> const& Vijkl_={})
         : Kmat(Kmat_), Umat(Umat_), Vijkl(Vijkl_)
     {}
 
@@ -41,6 +41,7 @@ struct Fermionic {
 
     void Interaction(itensor::AutoMPO& h) const
     {
+        if (Umat.empty() && Vijkl.empty()) return;
         if (!Rot.empty()) return InteractionRot(h);
         int L=length();
         // Uij ni nj

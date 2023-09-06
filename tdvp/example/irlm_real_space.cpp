@@ -2,15 +2,16 @@
 #include "it_dmrg.h"
 #include "it_tdvp.h"
 
-#include<iostream>
-#include<iomanip>
+#include <iostream>
+#include <iomanip>
+#include <fstream>
 
 using namespace std;
 
 int main()
 {
     IRLM model {.L=20, .t=0.5, .V=0.15, .U=0.1};
-    HamSys sys=model.HamStar();
+    HamSys sys=model.Ham();
     cout<<"bond dimension of H: "<< maxLinkDim(sys.ham) << endl;
 
     // solve the gs of system
@@ -29,15 +30,17 @@ int main()
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
 
-    auto rot=model.rotStar();
-    auto sys2=IRLM {.L=20, .t=0.5, .V=0.15, .U=-0.5}.HamStar();
+    auto sys2=IRLM {.L=20, .t=0.5, .V=0.15, .U=-0.5}.Ham();
     cout<<"bond dimension of H: "<< maxLinkDim(sys2.ham) << endl;
     it_tdvp sol {sys2, sol_gs.psi};
     sol.bond_dim=256;
-    cout<<"\nsweep bond-dim energy\n";
+    ofstream out("irlm_real_space_L"s+to_string(sol.hamsys.ham.length())+".txt");
+    out<<"sweep bond-dim energy\n";
+    out<<"0 "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
+    out<<setprecision(16);
     for(auto i=0u; i<100; i++) {
         sol.iterate();
-        cout<<i+1<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
+        out<<(i+1)*abs(sol.dt)<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
     }
 
     return 0;
