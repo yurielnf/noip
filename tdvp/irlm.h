@@ -61,8 +61,9 @@ struct IRLM {
 
     static auto rotOp(arma::mat const& rot)
     {
-        arma::mat h=arma::imag(arma::logmat(rot));
+        arma::mat h=-arma::imag(arma::logmat(rot));
         std::cout<<arma::norm(arma::real(arma::logmat(rot)));
+        std::cout<<arma::norm(arma::imag(arma::logmat(rot)));
         std::cout.flush();
         return Fermionic(h).Ham();
     }

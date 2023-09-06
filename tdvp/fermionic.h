@@ -82,7 +82,15 @@ struct Fermionic {
         return {sites, itensor::toMPO(h)};
     }
 
-    static itensor::VecVecR cc_matrix(itensor::MPS const& gs, itensor::Fermion const& sites) { return correlationMatrix(gs, sites,"Cdag","C"); }
+    static itensor::VecVecR cc_matrix(itensor::MPS const& gs, itensor::Fermion const& sites)
+    {
+        auto ccz=correlationMatrixC(gs, sites,"Cdag","C");
+        itensor::VecVecR cc(ccz.size(), itensor::VecR(ccz.at(0).size()));
+        for(auto i=0u; i<ccz.size(); i++)
+            for(auto j=0u; j<ccz[i].size(); j++)
+                cc[i][j]=std::real(ccz[i][j]);
+        return cc;
+    }
 };
 
 #endif // FERMIONIC_H
