@@ -27,7 +27,7 @@ int main()
         sol_gs.iterate();
         cout<<i+1<<" "<<maxLinkDim(sol_gs.psi)<<" "<<sol_gs.energy<<endl;
     }
-    auto cc1=model.cc_matrix(sol_gs.psi, sol_gs.hamsys.sites);
+    auto cc1=Fermionic::cc_matrix(sol_gs.psi, sol_gs.hamsys.sites);
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
 
@@ -41,21 +41,21 @@ int main()
         it_tdvp sol {sys2, psi};
         sol.bond_dim=256;
         ofstream out("irlm_star_L"s+to_string(sol.hamsys.ham.length())+".txt");
-        out<<"sweep bond-dim energy\n"<<setprecision(16);
+        out<<"sweep bond_dim energy\n"<<setprecision(16);
         out<<"0 "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
         for(auto i=0u; i<100; i++) {
             sol.iterate();
             out<<(i+1)*abs(sol.dt)<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
         }
-        auto cc=model.cc_matrix(sol.psi, sol.hamsys.sites);
-        rot=model.rotNO(cc);
+        auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
+        rot=Fermionic::rotNO(cc);
         psi=sol.psi;
     }
 
     cout<<"\n-------------------------- rotate the psi to natural orbitals ----------------\n";
 
     {
-        auto sys3=model.rotOp(rot);
+        auto sys3=Fermionic::rotOp(rot);
         it_tdvp sol {sys3, psi};
         sol.bond_dim=256;
         ofstream out("irlm_nat_orb_L"s+to_string(sol.hamsys.ham.length())+".txt");

@@ -43,7 +43,6 @@ struct Fermionic {
     {
         if (Umat.empty() && Vijkl.empty()) return;
         if (!Rot.empty()) return InteractionRot(h);
-        int L=length();
         // Uij ni nj
         for(int i=0;i<Umat.n_rows; i++)
             for(int j=0;j<Umat.n_cols; j++)
@@ -85,12 +84,43 @@ struct Fermionic {
     static itensor::VecVecR cc_matrix(itensor::MPS const& gs, itensor::Fermion const& sites)
     {
         auto ccz=correlationMatrixC(gs, sites,"Cdag","C");
-        itensor::VecVecR cc(ccz.size(), itensor::VecR(ccz.at(0).size()));
+        itensor::VecVecR cc(ccz.size());
         for(auto i=0u; i<ccz.size(); i++)
             for(auto j=0u; j<ccz[i].size(); j++)
-                cc[i][j]=std::real(ccz[i][j]);
+                cc[i].push_back( std::real(ccz[i][j]) );
         return cc;
     }
+
+    static auto rotNO(itensor::VecVecR const& cc)
+    {
+        arma::mat evec, ccm(cc.size(),cc.size());
+        arma::vec eval;
+        for(auto i=0u; i<ccm.n_rows; i++)
+            for(auto j=0u; j<ccm.n_cols; j++)
+                ccm(i,j)=std::real(cc[i][j]);
+        arma::eig_sym(eval,evec,ccm);
+        eval.print("evals");
+        return evec;
+    }
+
+    static HamSys rotOp(arma::mat const& rot)
+    {
+        arma::cx_mat kin=arma::logmat(rot)*arma::cx_double(0,1);
+        {
+            std::cout<<arma::norm(arma::real(kin))<<" ";
+            std::cout<<arma::norm(arma::imag(kin))<<"\n";
+            std::cout.flush();
+        }
+        auto L=rot.n_cols;
+        itensor::Fermion sites(L, {"ConserveQNs=",false});
+        itensor::AutoMPO h(sites);
+        for(int i=0;i<L; i++)
+            for(int j=0;j<L; j++)
+                if (std::abs(kin(i,j))>1e-15)
+                    h += kin(i,j),"Cdag",i+1,"C",j+1;
+        return {sites, itensor::toMPO(h)};
+    }
+
 };
 
 #endif // FERMIONIC_H

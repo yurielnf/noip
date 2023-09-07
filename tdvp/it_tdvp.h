@@ -20,7 +20,11 @@ struct it_tdvp {
     HamSys hamsys;
     itensor::MPS psi;
 
-    it_tdvp(HamSys const& hamsys_, itensor::MPS const& psi_) : hamsys(hamsys_), psi(psi_) { psi.replaceSiteInds(hamsys.sites.inds()); }
+    it_tdvp(HamSys const& hamsys_, itensor::MPS const& psi_) : hamsys(hamsys_), psi(psi_)
+    {
+        psi.replaceSiteInds(hamsys.sites.inds());
+        energy=std::real(itensor::innerC(psi, hamsys.ham, psi));
+    }
 
     std::complex<double> time() const { return dt * static_cast<double>(nsweep); }
 

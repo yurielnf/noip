@@ -48,33 +48,9 @@ struct IRLM {
         return Fermionic(K,Umat,rot).Ham();
     }
 
-    static auto rotNO(itensor::VecVecR const& cc)
-    {
-        arma::mat evec, ccm(cc.size(),cc.size());
-        arma::vec eval;
-        for(auto i=0u; i<ccm.n_rows; i++)
-            for(auto j=0u; j<ccm.n_cols; j++)
-                ccm(i,j)=std::real(cc[i][j]);
-        arma::eig_sym(eval,evec,ccm);
-        return evec;
-    }
-
-    static auto rotOp(arma::mat const& rot)
-    {
-        arma::mat h=-arma::imag(arma::logmat(rot));
-        std::cout<<arma::norm(arma::real(arma::logmat(rot)));
-        std::cout<<arma::norm(arma::imag(arma::logmat(rot)));
-        std::cout.flush();
-        return Fermionic(h).Ham();
-    }
-
     HamSys HamStar() const { return Ham(rotStar(), true); }
 
-    HamSys HamNO(itensor::VecVecR const& cc, bool fromStar=true) const { auto R=rotNO(cc); if (fromStar) R=R*rotStar(); return Ham(R); }
-
-    static itensor::VecVecR cc_matrix(itensor::MPS const& gs, itensor::Fermion const& sites) { return Fermionic::cc_matrix(gs,sites); }
-
-
+    HamSys HamNO(itensor::VecVecR const& cc, bool fromStar=true) const { auto R=Fermionic::rotNO(cc); if (fromStar) R=R*rotStar(); return Ham(R); }
 
 };
 
