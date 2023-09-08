@@ -91,7 +91,7 @@ struct Fermionic {
         return cc;
     }
 
-    static auto rotNO(itensor::VecVecR const& cc)
+    static arma::mat rotNO(itensor::VecVecR const& cc)
     {
         arma::mat evec, ccm(cc.size(),cc.size());
         arma::vec eval;
@@ -99,18 +99,27 @@ struct Fermionic {
             for(auto j=0u; j<ccm.n_cols; j++)
                 ccm(i,j)=std::real(cc[i][j]);
         arma::eig_sym(eval,evec,ccm);
-        eval.print("evals");
-        return evec;
+        std::cout<<"NO eigen error="<<arma::norm(ccm-evec*arma::diagmat(eval)*evec.t())<<std::endl;
+        arma::vec eval2(eval.size());
+        for(auto i=0u; i<eval.size(); i++)
+            eval2[i]=-std::min(eval[i], -eval[i]+1);
+        auto iev=arma::sort_index(eval2);
+        eval(iev).print("evals");
+        return evec.cols(iev);
     }
 
     static HamSys rotOp(arma::mat const& rot)
     {
-        arma::cx_mat kin=arma::logmat(rot)*arma::cx_double(0,1);
+        const auto im=arma::cx_double(0,1);
+        arma::cx_mat kin=arma::logmat(rot)*im;
         {
-            std::cout<<arma::norm(arma::real(kin))<<" ";
+            std::cout<<"norm(hrot)="<<arma::norm(arma::real(kin))<<" ";
             std::cout<<arma::norm(arma::imag(kin))<<"\n";
             std::cout.flush();
         }
+        std::cout<<"rot unitary error="<<arma::norm(rot.t()*rot-arma::eye(arma::size(rot)))<<std::endl;
+        std::cout<<"log(rot) Hermitian error="<<arma::norm(kin-kin.t())<<std::endl;
+        std::cout<<"exp error="<<arma::norm(arma::expmat(-im*kin)-rot)<<std::endl;
         auto L=rot.n_cols;
         itensor::Fermion sites(L, {"ConserveQNs=",false});
         itensor::AutoMPO h(sites);

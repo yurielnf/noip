@@ -10,8 +10,9 @@ using namespace std;
 
 int main()
 {
-    IRLM model {.L=20, .t=0.5, .V=0.15, .U=0.1};
-    HamSys sys=IRLM {.L=20, .t=0.5, .V=0.15, .U=0.1}.HamStar();
+    int len=10;
+    IRLM model {.L=len, .t=0.5, .V=0.15, .U=0.1};
+    HamSys sys=model.HamStar();
     cout<<"bond dimension of H: "<< maxLinkDim(sys.ham) << endl;
 
     // solve the gs of system
@@ -35,7 +36,7 @@ int main()
     auto rot=model.rotStar();
     itensor::MPS psi=sol_gs.psi;
     {
-        IRLM model {.L=20, .t=0.5, .V=0.15, .U=-0.5};
+        IRLM model {.L=len, .t=0.5, .V=0.15, .U=-0.5};
         auto sys2=model.HamStar();
         cout<<"bond dimension of H: "<< maxLinkDim(sys2.ham) << endl;
         it_tdvp sol {sys2, psi};
@@ -48,23 +49,38 @@ int main()
             out<<(i+1)*abs(sol.dt)<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
         }
         auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
-        rot=Fermionic::rotNO(cc);
+        for(auto i=0u; i<sys.sites.length(); i++)
+            cout<<cc[i][i]<<endl;
+        rot=Fermionic::rotNO(cc);//model.rotStar();//
         psi=sol.psi;
     }
 
     cout<<"\n-------------------------- rotate the psi to natural orbitals ----------------\n";
 
     {
-        auto sys3=Fermionic::rotOp(rot);
+        auto sys3=Fermionic::rotOp(rot.t());
         it_tdvp sol {sys3, psi};
-        sol.bond_dim=256;
+        sol.dt={0,0.01};
+//        sol.err_goal=1e-12;
+        sol.bond_dim=128;
         ofstream out("irlm_nat_orb_L"s+to_string(sol.hamsys.ham.length())+".txt");
         out<<setprecision(16);
+        sol.psi.orthogonalize({"Cutoff",1e-7});
+        for(auto i=0u; i<sol.psi.length(); i++)
+            cout<<itensor::leftLinkIndex(sol.psi,i+1).dim()<<" ";
         out<<"0 "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
-        for(auto i=0u; i<10; i++) {
+        for(auto i=0u; i*sol.dt.imag()<1.0; i++) {
             sol.iterate();
+            if ((i+1)*sol.dt.imag()>=1.0) {
+                sol.psi.orthogonalize({"Cutoff",1e-7});
+                for(auto i=0u; i<sol.psi.length(); i++)
+                    cout<<itensor::leftLinkIndex(sol.psi,i+1).dim()<<" ";
+            }
             out<<(i+1)*abs(sol.dt)<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
         }
+        auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
+        for(auto i=0u; i<sys.sites.length(); i++)
+            cout<<cc[i][i]<<endl;
     }
 
     return 0;
