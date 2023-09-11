@@ -8,10 +8,37 @@
 
 using namespace std;
 
+void rotateToNO(itensor::MPS psi, arma::mat const& rot)
+{
+    auto sys3=Fermionic::rotOp(rot);
+    it_tdvp sol {sys3, psi};
+    sol.dt={0,0.01};
+//        sol.err_goal=1e-12;
+    sol.bond_dim=256;
+    ofstream out("irlm_nat_orb_L"s+to_string(sol.hamsys.ham.length())+".txt");
+    out<<setprecision(16);
+    sol.psi.orthogonalize({"Cutoff",1e-7});
+    for(auto i=0; i<sol.psi.length(); i++)
+        cout<<itensor::leftLinkIndex(sol.psi,i+1).dim()<<" ";
+    out<<"0 "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
+    for(auto i=0u; i*sol.dt.imag()<1.0; i++) {
+        sol.iterate();
+        if ((i+1)*sol.dt.imag()>=1.0) {
+            sol.psi.orthogonalize({"Cutoff",1e-7});
+            for(auto i=0; i<sol.psi.length(); i++)
+                cout<<itensor::leftLinkIndex(sol.psi,i+1).dim()<<" ";
+        }
+        out<<(i+1)*abs(sol.dt)<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
+    }
+    auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
+    cc.diag().print("ni");
+}
+
+
 int main()
 {
-    int len=10;
-    IRLM model {.L=len, .t=0.5, .V=0.15, .U=0.1};
+    int len=20;
+    IRLM model {.L=len, .t=0.5, .V=0.15, .U=-0.5};
     HamSys sys=model.HamStar();
     cout<<"bond dimension of H: "<< maxLinkDim(sys.ham) << endl;
 
@@ -29,6 +56,12 @@ int main()
         cout<<i+1<<" "<<maxLinkDim(sol_gs.psi)<<" "<<sol_gs.energy<<endl;
     }
     auto cc1=Fermionic::cc_matrix(sol_gs.psi, sol_gs.hamsys.sites);
+
+    cout<<"\n-------------------------- rotate the psi to natural orbitals ----------------\n";
+
+    rotateToNO(sol_gs.psi, Fermionic::rotNO(cc1));
+    return 0;
+
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
 
@@ -49,39 +82,14 @@ int main()
             out<<(i+1)*abs(sol.dt)<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
         }
         auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
-        for(auto i=0u; i<sys.sites.length(); i++)
-            cout<<cc[i][i]<<endl;
+        cc.diag().print("ni");
         rot=Fermionic::rotNO(cc);//model.rotStar();//
         psi=sol.psi;
     }
 
     cout<<"\n-------------------------- rotate the psi to natural orbitals ----------------\n";
 
-    {
-        auto sys3=Fermionic::rotOp(rot.t());
-        it_tdvp sol {sys3, psi};
-        sol.dt={0,0.01};
-//        sol.err_goal=1e-12;
-        sol.bond_dim=128;
-        ofstream out("irlm_nat_orb_L"s+to_string(sol.hamsys.ham.length())+".txt");
-        out<<setprecision(16);
-        sol.psi.orthogonalize({"Cutoff",1e-7});
-        for(auto i=0u; i<sol.psi.length(); i++)
-            cout<<itensor::leftLinkIndex(sol.psi,i+1).dim()<<" ";
-        out<<"0 "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
-        for(auto i=0u; i*sol.dt.imag()<1.0; i++) {
-            sol.iterate();
-            if ((i+1)*sol.dt.imag()>=1.0) {
-                sol.psi.orthogonalize({"Cutoff",1e-7});
-                for(auto i=0u; i<sol.psi.length(); i++)
-                    cout<<itensor::leftLinkIndex(sol.psi,i+1).dim()<<" ";
-            }
-            out<<(i+1)*abs(sol.dt)<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
-        }
-        auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
-        for(auto i=0u; i<sys.sites.length(); i++)
-            cout<<cc[i][i]<<endl;
-    }
+    rotateToNO(psi, rot);
 
     return 0;
 }

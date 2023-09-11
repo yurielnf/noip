@@ -50,7 +50,7 @@ struct IRLM {
 
     HamSys HamStar() const { return Ham(rotStar(), true); }
 
-    HamSys HamNO(itensor::VecVecR const& cc, bool fromStar=true) const { auto R=Fermionic::rotNO(cc); if (fromStar) R=R*rotStar(); return Ham(R); }
+    HamSys HamNO(arma::mat const& cc, bool fromStar=true) const { auto R=Fermionic::rotNO(cc); if (fromStar) R=R*rotStar(); return Ham(R); }
 
 };
 

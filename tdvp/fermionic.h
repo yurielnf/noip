@@ -81,25 +81,22 @@ struct Fermionic {
         return {sites, itensor::toMPO(h)};
     }
 
-    static itensor::VecVecR cc_matrix(itensor::MPS const& gs, itensor::Fermion const& sites)
+    static arma::mat cc_matrix(itensor::MPS const& gs, itensor::Fermion const& sites)
     {
         auto ccz=correlationMatrixC(gs, sites,"Cdag","C");
-        itensor::VecVecR cc(ccz.size());
+        arma::mat cc(ccz.size(), ccz.size());
         for(auto i=0u; i<ccz.size(); i++)
             for(auto j=0u; j<ccz[i].size(); j++)
-                cc[i].push_back( std::real(ccz[i][j]) );
+                cc(i,j)=std::real(ccz[i][j]);
         return cc;
     }
 
-    static arma::mat rotNO(itensor::VecVecR const& cc)
+    static arma::mat rotNO(arma::mat const& cc)
     {
-        arma::mat evec, ccm(cc.size(),cc.size());
+        arma::mat evec;
         arma::vec eval;
-        for(auto i=0u; i<ccm.n_rows; i++)
-            for(auto j=0u; j<ccm.n_cols; j++)
-                ccm(i,j)=std::real(cc[i][j]);
-        arma::eig_sym(eval,evec,ccm);
-        std::cout<<"NO eigen error="<<arma::norm(ccm-evec*arma::diagmat(eval)*evec.t())<<std::endl;
+        arma::eig_sym(eval,evec,cc);
+        std::cout<<"NO eigen error="<<arma::norm(cc-evec*arma::diagmat(eval)*evec.t())<<std::endl;
         arma::vec eval2(eval.size());
         for(auto i=0u; i<eval.size(); i++)
             eval2[i]=-std::min(eval[i], -eval[i]+1);
@@ -111,7 +108,7 @@ struct Fermionic {
     static HamSys rotOp(arma::mat const& rot)
     {
         const auto im=arma::cx_double(0,1);
-        arma::cx_mat kin=arma::logmat(rot)*im;
+        arma::cx_mat kin=arma::logmat(rot.t())*im; // we need to invert the rotation
         {
             std::cout<<"norm(hrot)="<<arma::norm(arma::real(kin))<<" ";
             std::cout<<arma::norm(arma::imag(kin))<<"\n";
@@ -119,7 +116,7 @@ struct Fermionic {
         }
         std::cout<<"rot unitary error="<<arma::norm(rot.t()*rot-arma::eye(arma::size(rot)))<<std::endl;
         std::cout<<"log(rot) Hermitian error="<<arma::norm(kin-kin.t())<<std::endl;
-        std::cout<<"exp error="<<arma::norm(arma::expmat(-im*kin)-rot)<<std::endl;
+        std::cout<<"exp error="<<arma::norm(arma::expmat(-im*kin)-rot.t())<<std::endl;
         auto L=rot.n_cols;
         itensor::Fermion sites(L, {"ConserveQNs=",false});
         itensor::AutoMPO h(sites);
