@@ -10,7 +10,8 @@ using namespace std;
 
 int main()
 {
-    IRLM model {.L=20, .t=0.5, .V=0.15, .U=0.1};
+    int len=10;
+    IRLM model {.L=len, .t=0.5, .V=0.15, .U=0.1};
     HamSys sys=model.HamStar();
     cout<<"bond dimension of H: "<< maxLinkDim(sys.ham) << endl;
 
@@ -30,7 +31,7 @@ int main()
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
 
-    auto sys2=IRLM {.L=20, .t=0.5, .V=0.15, .U=-0.5}.HamStar();
+    auto sys2=IRLM {.L=len, .t=0.5, .V=0.15, .U=-0.5}.HamStar();
     cout<<"bond dimension of H: "<< maxLinkDim(sys2.ham) << endl;
     it_tdvp sol {sys2, sol_gs.psi};
     sol.bond_dim=256;

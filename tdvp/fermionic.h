@@ -66,7 +66,7 @@ struct Fermionic {
                         for(int i=0;i<Umat.n_rows; i++)
                             for(int j=0;j<Umat.n_cols; j++)
                                 if (fabs(Umat(i,j))>1e-15)
-                                    Vabcd += Umat(i,j)*Rot(a,i)*Rot(b,i)*Rot(c,j)*Rot(d,j);
+                                    Vabcd += Umat(i,j)*Rot(i,a)*Rot(i,b)*Rot(j,c)*Rot(j,d);
                         if (fabs(Vabcd)>1e-15)
                             h += Vabcd,"Cdag",a+1,"C",b+1,"Cdag",c+1,"C",d+1;
                     }
@@ -96,7 +96,6 @@ struct Fermionic {
         arma::mat evec;
         arma::vec eval;
         arma::eig_sym(eval,evec,cc);
-        std::cout<<"NO eigen error="<<arma::norm(cc-evec*arma::diagmat(eval)*evec.t())<<std::endl;
         arma::vec eval2(eval.size());
         for(auto i=0u; i<eval.size(); i++)
             eval2[i]=-std::min(eval[i], -eval[i]+1);
@@ -108,15 +107,7 @@ struct Fermionic {
     static HamSys rotOp(arma::mat const& rot)
     {
         const auto im=arma::cx_double(0,1);
-        arma::cx_mat kin=arma::logmat(rot.t())*im; // we need to invert the rotation
-        {
-            std::cout<<"norm(hrot)="<<arma::norm(arma::real(kin))<<" ";
-            std::cout<<arma::norm(arma::imag(kin))<<"\n";
-            std::cout.flush();
-        }
-        std::cout<<"rot unitary error="<<arma::norm(rot.t()*rot-arma::eye(arma::size(rot)))<<std::endl;
-        std::cout<<"log(rot) Hermitian error="<<arma::norm(kin-kin.t())<<std::endl;
-        std::cout<<"exp error="<<arma::norm(arma::expmat(-im*kin)-rot.t())<<std::endl;
+        arma::cx_mat kin=arma::logmat(rot.t())*im; // we need to invert the rotation               
         auto L=rot.n_cols;
         itensor::Fermion sites(L, {"ConserveQNs=",false});
         itensor::AutoMPO h(sites);
