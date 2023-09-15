@@ -17,9 +17,9 @@ State rotateState(itensor::MPS psi, arma::mat const& rot)
 {
     auto sys3=Fermionic::rotOp(rot);
     it_tdvp sol {sys3, psi};
-    sol.dt={0,0.1};
+    sol.dt={0,0.01};
 //        sol.err_goal=1e-12;
-    sol.bond_dim=256;
+    sol.bond_dim=128;
     sol.psi.orthogonalize({"Cutoff",1e-7});
     for(auto i=0; i<sol.psi.length(); i++)
         cout<<itensor::leftLinkIndex(sol.psi,i+1).dim()<<" ";
@@ -32,6 +32,7 @@ State rotateState(itensor::MPS psi, arma::mat const& rot)
                 cout<<itensor::leftLinkIndex(sol.psi,i+1).dim()<<" ";
             cout<<endl;
         }
+        //cout<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys3.ham) <<" "<<maxLinkDim(sol.psi)<<endl;
     }
     auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
     cc.diag().print("ni");
@@ -43,25 +44,27 @@ State computeGS(HamSys sys)
     cout<<"bond dimension of H: "<< maxLinkDim(sys.ham) << endl;
     it_dmrg sol_gs {sys};
     sol_gs.bond_dim=64;
-    sol_gs.noise=1e-3;
+    sol_gs.noise=1e-5;
     cout<<"\nsweep bond-dim energy\n";
-    for(auto i=0u; i<6; i++) {
+    for(auto i=0u; i<10; i++) {
         if (i==3) {
-            sol_gs.noise=1e-8;
-            sol_gs.nIter_diag=32;
+            sol_gs.noise=1e-10;
+//            sol_gs.nIter_diag=2;
         }
+        else if (i==9) sol_gs.noise=0;
         sol_gs.iterate();
         cout<<i+1<<" "<<maxLinkDim(sol_gs.psi)<<" "<<sol_gs.energy<<endl;
     }
     for(auto i=0; i<sol_gs.psi.length(); i++)
         cout<<itensor::leftLinkIndex(sol_gs.psi,i+1).dim()<<" ";
+    cout << "\n";
     return {sol_gs.psi, sol_gs.hamsys.sites};
 }
 
 
 int main()
 {
-    int len=10;
+    int len=20;
 
     cout<<"\n-------------------------- solve the gs of system ----------------\n";
 
@@ -88,9 +91,11 @@ int main()
         auto sys2=model2.Ham(rot);
         it_tdvp sol {sys2, psi};
         sol.bond_dim=256;
-        cout<<"0 "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
-        sol.iterate();
-        cout<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
+        cout<<"0 "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
+        for(auto k=0; k<1; k++) {
+            sol.iterate();
+            cout<<(i*1+k+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
+        }
         cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
         cc.diag().print("ni");
         auto rot1=Fermionic::rotNO(cc);

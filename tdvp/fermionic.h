@@ -65,7 +65,7 @@ struct Fermionic {
                         double Vabcd=0;
                         for(int i=0;i<Umat.n_rows; i++)
                             for(int j=0;j<Umat.n_cols; j++)
-                                if (fabs(Umat(i,j))>1e-15)
+//                                if (fabs(Umat(i,j))>1e-15)
                                     Vabcd += Umat(i,j)*Rot(i,a)*Rot(i,b)*Rot(j,c)*Rot(j,d);
                         if (fabs(Vabcd)>1e-15)
                             h += Vabcd,"Cdag",a+1,"C",b+1,"Cdag",c+1,"C",d+1;

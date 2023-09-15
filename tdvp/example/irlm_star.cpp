@@ -20,7 +20,7 @@ int main()
     sol_gs.bond_dim=64;
     sol_gs.noise=1e-3;
     cout<<"\nsweep bond-dim energy\n";
-    for(auto i=0u; i<6; i++) {
+    for(auto i=0u; i<10; i++) {
         if (i==3) {
             sol_gs.noise=1e-8;
             sol_gs.nIter_diag=32;

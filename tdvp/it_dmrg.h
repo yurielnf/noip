@@ -18,7 +18,13 @@ struct it_dmrg {
     it_dmrg(HamSys const& hamsys_)
         : hamsys {hamsys_}
         , psi {itensor::randomMPS(hamsys_.sites)}
-    {}
+    {
+//        auto state = itensor::InitState(hamsys.sites,"0");
+//        for(int j = 1; j <= hamsys.sites.length()/2; j += 1)
+//            state.set(j,"1");
+
+//        psi = itensor::randomMPS(state);
+    }
 
     void iterate()
     {
