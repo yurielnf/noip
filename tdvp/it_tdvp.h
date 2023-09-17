@@ -7,7 +7,7 @@
 
 struct it_tdvp {
     int bond_dim=64;
-    int nIter_diag=32;
+    int nIter_diag=16;
     double rho_cutoff=1e-12;
     double noise=0; //1e-8;
     std::complex<double> dt={0, 0.1};
@@ -38,8 +38,9 @@ struct it_tdvp {
         if (noise != 0)
         {
             // Global subspace expansion
-            std::vector<double> epsilonK = {1E-12, 1E-12};
-            addBasis(psi,hamsys.ham,epsilonK,
+            //std::vector<double> epsilonK = {1E-12, 1E-12};
+            std::vector<int> maxDimK={2*bond_dim,2*bond_dim};
+            addBasis(psi,hamsys.ham,maxDimK,
                      {"Cutoff",noise,
                       "Method","DensityMatrix",
                       "KrylovOrd",3,

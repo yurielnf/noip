@@ -6,9 +6,31 @@
 #include <array>
 #include <itensor/all.h>
 
+auto eig_unitary(const arma::mat& A)
+{
+    using namespace arma;
+    cx_vec eval, eval2;
+    cx_mat evec, Q, R;
+    eig_gen(eval, evec, A);
+    qr(Q, R, evec);
+    cx_mat RDR=R*diagmat(eval)*R.i();
+    eval2=RDR.diag();
+    std::cout<<"error diag RDR="<<norm(RDR-diagmat(eval))<<std::endl;
+    double err=norm(A-Q*diagmat(eval2)*Q.t());
+    std::cout<<"err eig_unitary="<<err<<std::endl;
+    std::cout<<"err |eval|-1="<<norm(arma::abs(eval2)-ones(A.n_cols))<<std::endl;
+    return make_pair(eval2,Q);
+}
+
+
 struct HamSys {
     itensor::Fermion sites;
     itensor::MPO ham;
+};
+
+struct HamSysExact {
+    itensor::Fermion sites;
+    itensor::AutoMPO ampo;
 };
 
 struct Fermionic {
@@ -99,15 +121,96 @@ struct Fermionic {
         arma::vec eval2(eval.size());
         for(auto i=0u; i<eval.size(); i++)
             eval2[i]=-std::min(eval[i], -eval[i]+1);
-        auto iev=arma::sort_index(eval2);
+        arma::uvec iev=arma::sort_index(eval2);
         eval(iev).print("evals");
         return evec.cols(iev);
     }
 
+    static arma::mat rotNO2(arma::mat const& cc, double tolWannier=1e-5)
+    {
+        using namespace arma;
+        arma::mat evec;
+        arma::vec eval;
+        arma::eig_sym(eval,evec,cc);
+        arma::vec eval2(eval.size());
+        for(auto i=0u; i<eval.size(); i++)
+            eval2[i]=-std::min(eval[i], -eval[i]+1);    //activity sorting
+        arma::uvec iev=arma::sort_index(eval2);
+        eval(iev).print("evals");
+
+        arma::mat evec2=evec.cols(iev);
+        arma::mat evec3=evec2;
+
+        // Wannier after activity sorting
+        arma::mat J=arma::diagmat(arma::regspace(0,eval.size()-1));
+        {
+            std::vector<size_t> ieval0v;
+            for(auto i=0u; i<eval.size(); i++)
+                if (eval[iev[i]]<tolWannier) ieval0v.push_back(i);
+            uvec ieval0=conv_to<uvec>::from(ieval0v);
+            arma::mat evec0=evec2.cols(ieval0);
+            arma::mat X=evec0.t()* J * evec0;
+            arma::mat wevec;
+            arma::vec weval;
+            arma::eig_sym(weval,wevec,X);
+            evec3.cols(ieval0) = evec2.cols(ieval0) * wevec;
+        }
+        arma::mat evec4=evec3;
+        {
+            std::vector<size_t> ieval0v;
+            for(auto i=0u; i<eval.size(); i++)
+                if (std::abs(1.0-eval[iev[i]])<tolWannier) ieval0v.push_back(i);
+            uvec ieval0=conv_to<uvec>::from(ieval0v);
+            arma::mat evec0=evec3.cols(ieval0);
+            arma::mat X=evec0.t()* J * evec0;
+            arma::mat wevec;
+            arma::vec weval;
+            arma::eig_sym(weval,wevec,X);
+            evec4.cols(ieval0) = evec3.cols(ieval0) * wevec;
+        }
+
+        return evec4;
+    }
+
+    static HamSysExact rotOpExact(arma::mat const& rot)
+    {
+        arma::mat rott=rot.t();
+        arma::cx_mat logrot;
+        const auto im=arma::cx_double(0,1);
+        {
+            arma::cx_mat evec;
+            arma::cx_colvec eval;
+            arma::eig_gen(eval,evec,rott);
+            logrot=evec*arma::diagmat(arma::log(eval)*im)*evec.i();
+        }
+        arma::cx_mat kin=logrot; //arma::logmat(rott)*im; // we need to invert the rotation
+        auto L=rot.n_cols;
+        itensor::Fermion sites(L, {"ConserveQNs=",false});
+        itensor::AutoMPO h(sites);
+        for(int i=0;i<L; i++)
+            for(int j=0;j<L; j++)
+                if (std::abs(kin(i,j))>1e-15)
+                    h += kin(i,j),"Cdag",i+1,"C",j+1;
+        arma::imag(kin).print("Hrot");
+        return {sites, h};
+    }
+
     static HamSys rotOp(arma::mat const& rot)
     {
+        arma::mat rott=rot.t();
+        arma::cx_mat logrot;
         const auto im=arma::cx_double(0,1);
-        arma::cx_mat kin=arma::logmat(rot.t())*im; // we need to invert the rotation               
+        {
+            auto [eval,evec]=eig_unitary(rott);
+            logrot=evec*arma::diagmat(arma::log(eval)*im)*evec.t();
+
+            double err=arma::norm(rott-arma::expmat(-im*logrot));
+            if (err>1e-13) std::cout<<"exp error="<<err<<std::endl;
+
+            double err_herm=norm(logrot.t()-logrot);
+            if (err_herm>1e-13) std::cout<<"Hermitian error="<<err_herm<<std::endl;
+        }
+        arma::cx_mat kin=logrot; //arma::logmat(rott)*im; // we need to invert the rotation
         auto L=rot.n_cols;
         itensor::Fermion sites(L, {"ConserveQNs=",false});
         itensor::AutoMPO h(sites);
