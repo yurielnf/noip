@@ -180,10 +180,12 @@ int main()
             cout<<(i*1+k+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
         }
         psi=sol.psi;
+        psi.orthogonalize({"Cutoff",1e-9});
         cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
         cc.diag().print("ni");
         auto rot1=Fermionic::rotNO2(cc);
         psi=rotateState3(sol.psi, rot1).psi;
+        psi.orthogonalize({"Cutoff",1e-9});
         rot = rot*rot1;
         for(auto i=0; i<sol.psi.length(); i++)
             cout<<itensor::leftLinkIndex(psi,i+1).dim()<<" ";
