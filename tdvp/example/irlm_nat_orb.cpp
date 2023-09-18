@@ -8,11 +8,6 @@
 
 using namespace std;
 
-
-
-
-
-
 struct State {
     itensor::MPS psi;
     itensor::Fermion sites;
@@ -143,11 +138,11 @@ State computeGS(HamSys sys)
 
 int main()
 {
-    int len=20;
+    int len=30;
 
     cout<<"\n-------------------------- solve the gs of system ----------------\n";
 
-    auto model1=IRLM {.L=len, .t=0.5, .V=0.15, .U=0.1};
+    auto model1=IRLM {.L=len, .t=0.5, .V=0.15, .U=-0.5};
     auto rot=model1.rotStar();
     //eig_unitary(rot);
     //return 0;
@@ -160,6 +155,13 @@ int main()
     cc.diag().print("ni");
     rot = rot*Fermionic::rotNO(cc);
     auto sol1b=computeGS(model1.Ham(rot));
+
+    auto psi1=sol1b.psi;
+    psi1.orthogonalize({"Cutoff",1e-9});
+    for(auto i=0; i<psi1.length(); i++)
+        cout<<itensor::leftLinkIndex(psi1,i+1).dim()<<" ";
+    cout << "\n";
+    return 0;
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
 

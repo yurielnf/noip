@@ -10,7 +10,7 @@ using namespace std;
 
 int main()
 {
-    IRLM model {.L=20, .t=0.5, .V=0.15, .U=0.1};
+    IRLM model {.L=30, .t=0.5, .V=0.15, .U=-0.5};
     HamSys sys=model.Ham();
     cout<<"bond dimension of H: "<< maxLinkDim(sys.ham) << endl;
 
@@ -27,6 +27,13 @@ int main()
         sol_gs.iterate();
         cout<<i+1<<" "<<maxLinkDim(sol_gs.psi)<<" "<<sol_gs.energy<<endl;
     }
+
+    sol_gs.psi.orthogonalize({"Cutoff",1e-10});
+    for(auto i=0; i<sol_gs.psi.length(); i++)
+        cout<<itensor::leftLinkIndex(sol_gs.psi,i+1).dim()<<" ";
+    cout << "\n";
+
+    return 0;
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
 
