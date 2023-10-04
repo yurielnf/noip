@@ -23,6 +23,7 @@ FetchContent_MakeAvailable(pybind11 armadillo)
 
 add_library(itensor STATIC IMPORTED) # or STATIC instead of SHARED
 set_target_properties(itensor PROPERTIES
+  IMPORTED_LOCATION "/home/yurielnf/opt/ITensor/lib/libitensor.a"
   IMPORTED_LOCATION_RELEASE "/home/yurielnf/opt/ITensor/lib/libitensor.a"
   IMPORTED_LOCATION_DEBUG "/home/yurielnf/opt/ITensor/lib/libitensor-g.a"
   INTERFACE_INCLUDE_DIRECTORIES "/home/yurielnf/opt/ITensor"
@@ -35,3 +36,5 @@ set_target_properties(tdvp PROPERTIES
 
 
 find_package(OpenMP REQUIRED)
+
+include(external/FindMKL.cmake)

@@ -18,11 +18,14 @@ add_library(${PROJECT_NAME} STATIC
 target_include_directories(${PROJECT_NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    ${MKL_INCLUDE_DIRS}
 )
 
 #set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
 
-target_link_libraries(${PROJECT_NAME} PUBLIC tdvp itensor openblas OpenMP::OpenMP_CXX)
+
+
+target_link_libraries(${PROJECT_NAME} PUBLIC "-Wl,--start-group" ${MKL_SEQUENTIAL_LAYER_LIBRARY} "-Wl,--end-group -lpthread -lm -ldl" tdvp itensor OpenMP::OpenMP_CXX)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC armadillo)
 
