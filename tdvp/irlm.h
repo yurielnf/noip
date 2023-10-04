@@ -10,6 +10,7 @@ struct IRLM {
     double t=0.5;
     double V=0.15;
     double U=-0.5;
+    double ed=0;
 
     auto matrices() const
     {
@@ -18,11 +19,13 @@ struct IRLM {
         for(auto i=1; i<L-1; i++)
             K(i,i+1)=K(i+1,i)=t;
         K(0,1)=K(1,0)=V;
+        K(0,0)=ed;
 
         // U ni nj
         arma::mat Umat(L,L,arma::fill::zeros);
         Umat(0,1)=U;
-        K(0,0)=K(1,1)=-U/2;
+        K(1,1)=-U/2;
+        K(0,0)+=-U/2;
         return std::make_pair(K,Umat);
     }
 

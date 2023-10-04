@@ -96,7 +96,7 @@ struct Fermionic {
 
     HamSys Ham() const
     {
-        itensor::Fermion sites(length(), {"ConserveQNs=",false});
+        itensor::Fermion sites(length(), {"ConserveNf=",true});
         itensor::AutoMPO h(sites);
         Kin(h);
         Interaction(h);
@@ -185,7 +185,7 @@ struct Fermionic {
         }
         arma::cx_mat kin=logrot; //arma::logmat(rott)*im; // we need to invert the rotation
         auto L=rot.n_cols;
-        itensor::Fermion sites(L, {"ConserveQNs=",false});
+        itensor::Fermion sites(L, {"ConserveNf=",true});
         itensor::AutoMPO h(sites);
         for(int i=0;i<L; i++)
             for(int j=0;j<L; j++)
@@ -212,7 +212,7 @@ struct Fermionic {
         }
         arma::cx_mat kin=logrot; //arma::logmat(rott)*im; // we need to invert the rotation
         auto L=rot.n_cols;
-        itensor::Fermion sites(L, {"ConserveQNs=",false});
+        itensor::Fermion sites(L, {"ConserveNf=",true});
         itensor::AutoMPO h(sites);
         for(int i=0;i<L; i++)
             for(int j=0;j<L; j++)
