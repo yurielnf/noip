@@ -27,7 +27,7 @@ State rotateState(itensor::MPS psi, arma::mat const& rot)
     cout<<endl;
     for(auto i=0u; i*sol.dt.imag()<1.0; i++) {
         sol.iterate();
-        if (i==2) sol.noise=0;
+        if (i==2) sol.epsilonM=0;
         if ((i+1)*sol.dt.imag()>=1.0) {
 //            sol.psi.orthogonalize({"Cutoff",1e-9});
             for(auto i=0; i<sol.psi.length(); i++)

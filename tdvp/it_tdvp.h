@@ -7,9 +7,9 @@
 
 struct it_tdvp {
     int bond_dim=64;
-    int nIter_diag=16;
-    double rho_cutoff=1e-12;
-    double noise=0; //1e-8;
+    int nIter_diag=32;
+    double rho_cutoff=1e-10;
+    double epsilonM=0; //1e-8;
     std::complex<double> dt={0, 0.1};
     bool do_normalize=true;
     double err_goal=1e-7;
@@ -35,13 +35,13 @@ struct it_tdvp {
         sweeps.cutoff() = rho_cutoff;
         sweeps.niter() = nIter_diag;
 
-        if (noise != 0)
+        if (epsilonM != 0)
         {
             // Global subspace expansion
-            //std::vector<double> epsilonK = {1E-12, 1E-12};
-            std::vector<int> maxDimK={2*bond_dim,2*bond_dim};
-            addBasis(psi,hamsys.ham,maxDimK,
-                     {"Cutoff",noise,
+            std::vector<double> epsilonK = {1E-4, 1E-4};
+            //std::vector<int> maxDimK={2*bond_dim,2*bond_dim};
+            addBasis(psi,hamsys.ham,epsilonK,
+                     {"Cutoff",epsilonM,
                       "Method","DensityMatrix",
                       "KrylovOrd",3,
                       "DoNormalize", do_normalize,
@@ -55,9 +55,8 @@ struct it_tdvp {
                        "DoNormalize", do_normalize,
                        "Quiet",true,
                        "Silent",silent,
-                       "NumCenter",2,
+                       "NumCenter",1,
                        "ErrGoal", err_goal});
-
 
         nsweep++;
     }
