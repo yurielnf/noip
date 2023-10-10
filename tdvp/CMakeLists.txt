@@ -13,6 +13,7 @@ add_library(${PROJECT_NAME} STATIC
     it_dmrg.h
     it_tdvp.h
     empty.cpp
+    irlm_wilson.h
 )
 
 target_include_directories(${PROJECT_NAME} PUBLIC
