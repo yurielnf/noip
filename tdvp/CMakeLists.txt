@@ -14,6 +14,7 @@ add_library(${PROJECT_NAME} STATIC
     it_tdvp.h
     empty.cpp
     irlm_wilson.h
+    it_tdvp_error.h
 )
 
 target_include_directories(${PROJECT_NAME} PUBLIC

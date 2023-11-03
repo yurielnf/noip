@@ -11,7 +11,7 @@ using namespace std;
 int main()
 {
     int len=30;
-    IRLM_wilson model {.L=len, .V0=0.5, .Lambda=2.0, .V=0.1, .U=0.25, .ed=-10};
+    IRLM_wilson model {.L=len, .V0=0.5, .Lambda=1.5, .V=0.1, .U=0.25, .ed=-10};
     HamSys sys=model.HamStar();
     cout<<setprecision(14);
     cout<<"bond dimension of H: "<< maxLinkDim(sys.ham) << endl;
@@ -38,9 +38,10 @@ int main()
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
 
-    auto sys2=IRLM_wilson {.L=len, .V0=0.5, .Lambda=2.0, .V=0.1, .U=0.25, .ed=0}.HamStar();
+    auto sys2=IRLM_wilson {.L=len, .V0=0.5, .Lambda=1.5, .V=0.1, .U=0.25, .ed=0}.HamStar();
     cout<<"bond dimension of H: "<< maxLinkDim(sys2.ham) << endl;
     it_tdvp sol {sys2, sol_gs.psi};
+    sol.dt={0,0.01};
     sol.bond_dim=512;
     sol.err_goal=1e-7;
     sol.epsilonM=1e-4;
@@ -50,8 +51,8 @@ int main()
     //ofstream out("irlm_star_L"s+to_string(sol.hamsys.ham.length())+".txt");
     cout<<"sweep bond-dim energy n0\n";
     cout<<"0 "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real()<<endl;
-    for(auto i=0u; i<1000; i++) {
-        sol.epsilonM= (i%10==0) ? 1e-4 : 0;
+    for(auto i=0u; i<10000; i++) {
+        sol.epsilonM= (i%100==0) ? 1e-4 : 0;
         if (false && i%20==0) {
             auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
             cc.diag().raw_print("ni=");
