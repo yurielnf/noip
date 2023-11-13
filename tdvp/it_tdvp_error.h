@@ -181,7 +181,7 @@ TDVPErrorWorker(MPS & psi,
         args.add("Truncate",args.getBool("Truncate",false));
 
     const int N = length(psi);
-    Real energy = NAN;
+    Real ph2 = 0;
 
     if((!isOrtho(psi)) || (psi.leftLim() != 0))
         psi.position(1);
@@ -213,7 +213,7 @@ TDVPErrorWorker(MPS & psi,
             }
 
         // 0, 1 and 2-site wavefunctions
-        ITensor phi0,phi1;
+        ITensor phi0, phi1, ph_phi0, ph_phi1;
         Spectrum spec;
         for(int b = 1, ha = 1; ha <= 2; sweepnext(b,ha,N,{"NumCenter=",numCenter}))
             {
@@ -228,15 +228,16 @@ TDVPErrorWorker(MPS & psi,
             else if(numCenter == 1)
                 phi1 = psi(b);
 
-            applyExp(H,phi1,t/2,args);
+            //applyExp(H,phi1,t/2,args);
+            H.product(phi1, ph_phi1);
 
-            if(args.getBool("DoNormalize",true))
-                phi1 /= norm(phi1);
+//            if(args.getBool("DoNormalize",true))
+//                phi1 /= norm(phi1);
 
-            if(numCenter == 2)
-                spec = psi.svdBond(b,phi1,(ha==1 ? Fromleft : Fromright),H,args);
-            else if(numCenter == 1)
-                psi.ref(b) = phi1;
+//            if(numCenter == 2)
+//                spec = psi.svdBond(b,phi1,(ha==1 ? Fromleft : Fromright),H,args);
+//            else if(numCenter == 1)
+//                psi.ref(b) = phi1;
 
             if((ha == 1 && b+numCenter-1 != N) || (ha == 2 && b != 1))
                 {
@@ -278,14 +279,14 @@ TDVPErrorWorker(MPS & psi,
                 // Calculate energy
                 ITensor H_phi0;
                 H.product(phi0,H_phi0);
-                energy = real(eltC(dag(phi0)*H_phi0));
+                ph2 = real(eltC(dag(phi0)*H_phi0));
                 }
             else
                 {
                 // Calculate energy
                 ITensor H_phi1;
                 H.product(phi1,H_phi1);
-                energy = real(eltC(dag(phi1)*H_phi1));
+                ph2 = real(eltC(dag(phi1)*H_phi1));
                 }
 
              if(!quiet)
@@ -303,7 +304,7 @@ TDVPErrorWorker(MPS & psi,
 
             args.add("AtBond",b);
             args.add("HalfSweep",ha);
-            args.add("Energy",energy);
+            args.add("Energy",ph2);
             args.add("Truncerr",spec.truncerr());
 
             obs.measure(args);
@@ -325,7 +326,7 @@ TDVPErrorWorker(MPS & psi,
     if(args.getBool("DoNormalize",true))
         psi.normalize();
 
-    return energy;
+    return ph2;
     }
 
 } //namespace itensor
