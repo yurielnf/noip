@@ -49,7 +49,7 @@ int main(int argc, char **argv)
     sol.rho_cutoff=1e-14;
     sol.silent=false;
     ofstream out("irlm_star_L"s+to_string(sol.hamsys.ham.length())+".txt");
-    out<<"sweep bond-dim energy n0\n";
+    out<<"sweep bond-dim energy n0\n"<<setprecision(14);
     out<<"0 "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real()<<endl;
     for(auto i=0u; i<len*10/2; i++) {
         sol.epsilonM=(i%10==0) ? 1e-4 : 0;
