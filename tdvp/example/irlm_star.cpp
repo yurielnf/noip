@@ -8,6 +8,7 @@
 
 using namespace std;
 
+/// ./irlm_star <len> [star]
 int main(int argc, char **argv)
 {
     bool star=true;

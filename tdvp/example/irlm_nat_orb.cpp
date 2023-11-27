@@ -113,7 +113,7 @@ State rotateState3(itensor::MPS psi, arma::mat const& rot)
     return {psi, sites};
 }
 
-State computeGS(HamSys sys)
+auto computeGS(HamSys sys)
 {
     cout<<"bond dimension of H: "<< maxLinkDim(sys.ham) << endl;
     it_dmrg sol_gs {sys};
@@ -132,13 +132,13 @@ State computeGS(HamSys sys)
     for(auto i=0; i<sol_gs.psi.length(); i++)
         cout<<itensor::leftLinkIndex(sol_gs.psi,i+1).dim()<<" ";
     cout << "\n";
-    return {sol_gs.psi, sol_gs.hamsys.sites};
+    return sol_gs;
 }
 
 
 int main()
 {
-    int len=30;
+    int len=10;
 
     cout<<"\n-------------------------- solve the gs of system ----------------\n";
 
@@ -151,38 +151,43 @@ int main()
 
     cout<<"\n-------------------------- rotate the H to natural orbitals: find the gs again ----------------\n";
 
-    auto cc=Fermionic::cc_matrix(sol1a.psi, sol1a.sites);
+    auto cc=Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites);
     cc.diag().print("ni");
     rot = rot*Fermionic::rotNO(cc);
-    auto sol1b=computeGS(model1.Ham(rot));
+    auto sys1b=model1.Ham(rot);
+    auto sol1b=computeGS(sys1b);
 
     auto psi1=sol1b.psi;
     psi1.orthogonalize({"Cutoff",1e-9});
     for(auto i=0; i<psi1.length(); i++)
         cout<<itensor::leftLinkIndex(psi1,i+1).dim()<<" ";
     cout << "\n";
-    return 0;
+    //return 0;
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
 
     auto model2=IRLM {.L=len, .t=0.5, .V=0.15, .U=-0.5};
-    auto psi=sol1b.psi;
 
-    cout<<"time M m energy\n" << setprecision(12);
-    auto sys2=model2.Ham(rot);
+    cout<<"time M m energy n0\n" << setprecision(12);
+    double n0=itensor::expectC(sol1b.psi, sol1b.hamsys.sites, "N",{1}).at(0).real();
+    cout<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<endl;
+    auto psi=sol1b.psi;
     for(auto i=0; i<100; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         auto sys2=model2.Ham(rot);
         it_tdvp sol {sys2, psi};
         sol.dt={0,0.1};
         sol.bond_dim=256;
-        cout<<"0 "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
-        for(auto k=0; k<1; k++) {
-            sol.iterate();
-            cout<<(i*1+k+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
-        }
+        sol.rho_cutoff=1e-14;
+        sol.silent=false;
+        sol.epsilonM=(i%10==0) ? 1e-4 : 0;
+
+        sol.iterate();
+        double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
+        cout<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
+
         psi=sol.psi;
-        psi.orthogonalize({"Cutoff",1e-9});
+        //psi.orthogonalize({"Cutoff",1e-9});
         cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
         cc.diag().print("ni");
         auto rot1=Fermionic::rotNO2(cc);
