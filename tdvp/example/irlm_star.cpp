@@ -10,10 +10,12 @@ using namespace std;
 
 int main(int argc, char **argv)
 {
+    bool star=true;
     int len=50;
-    if (argc==2) len=atoi(argv[1]);
+    if (argc>=2) len=atoi(argv[1]);
+    if (argc==3) star=atoi(argv[2]);
     IRLM model {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=-10};
-    HamSys sys=model.HamStar();
+    HamSys sys= star ? model.HamStar() : model.Ham();
     cout<<setprecision(14);
     cout<<"bond dimension of H: "<< maxLinkDim(sys.ham) << endl;
 
@@ -39,7 +41,8 @@ int main(int argc, char **argv)
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
 
-    auto sys2=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=0.0}.HamStar();
+    IRLM model2 {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=0.0};
+    auto sys2= star ? model2.HamStar() : model2.Ham();
     cout<<"bond dimension of H: "<< maxLinkDim(sys2.ham) << endl;
     it_tdvp sol {sys2, sol_gs.psi};
     sol.bond_dim=512;
@@ -65,3 +68,4 @@ int main(int argc, char **argv)
 
     return 0;
 }
+
