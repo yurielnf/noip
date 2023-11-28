@@ -93,10 +93,12 @@ State rotateState3(itensor::MPS psi, arma::mat const& rot)
 
 //        cout.flush();
 //    }
-    itensor::Fermion sites(psi.length());
+    itensor::Fermion sites(psi.length(), {"ConserveNf=",false});
     psi.replaceSiteInds(sites.inds());
     cout<<"it m(psi2) m(psi)\n";
     for(auto a=0u; a<psi.length(); a++) {
+        if (std::abs(eval(a))<1e-14) continue;
+        if (std::abs(eval(a)-1.0)<1e-14) continue;
         itensor::AutoMPO ampo(sites);
         for(auto i=0; i<psi.length(); i++)
             for(auto j=0; j<psi.length(); j++)
@@ -113,7 +115,7 @@ State rotateState3(itensor::MPS psi, arma::mat const& rot)
     return {psi, sites};
 }
 
-auto computeGS(HamSys sys)
+auto computeGS(HamSys const& sys)
 {
     cout<<"bond dimension of H: "<< maxLinkDim(sys.ham) << endl;
     it_dmrg sol_gs {sys};
@@ -162,7 +164,6 @@ int main()
     for(auto i=0; i<psi1.length(); i++)
         cout<<itensor::leftLinkIndex(psi1,i+1).dim()<<" ";
     cout << "\n";
-    //return 0;
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
 
@@ -194,7 +195,7 @@ int main()
         psi=rotateState3(sol.psi, rot1).psi;
         psi.orthogonalize({"Cutoff",1e-9});
         rot = rot*rot1;
-        for(auto i=0; i<sol.psi.length(); i++)
+                for(auto i=0; i<sol.psi.length(); i++)
             cout<<itensor::leftLinkIndex(psi,i+1).dim()<<" ";
         cout<<endl;
     }

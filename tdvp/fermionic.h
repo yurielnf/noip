@@ -96,7 +96,7 @@ struct Fermionic {
 
     HamSys Ham() const
     {
-        itensor::Fermion sites(length(), {"ConserveNf=",true});
+        itensor::Fermion sites(length(), {"ConserveNf=",false});
         itensor::AutoMPO h(sites);
         Kin(h);
         Interaction(h);
