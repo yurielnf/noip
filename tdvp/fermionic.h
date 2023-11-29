@@ -15,10 +15,12 @@ auto eig_unitary(const arma::mat& A)
     qr(Q, R, evec);
     cx_mat RDR=R*diagmat(eval)*R.i();
     eval2=RDR.diag();
-    std::cout<<"error diag RDR="<<norm(RDR-diagmat(eval))<<std::endl;
+#ifndef NDEBUG
     double err=norm(A-Q*diagmat(eval2)*Q.t());
+    std::cout<<"error diag RDR="<<norm(RDR-diagmat(eval))<<std::endl;
     std::cout<<"err eig_unitary="<<err<<std::endl;
     std::cout<<"err |eval|-1="<<norm(arma::abs(eval2)-ones(A.n_cols))<<std::endl;
+#endif
     return make_pair(eval2,Q);
 }
 
@@ -113,25 +115,29 @@ struct Fermionic {
         return cc;
     }
 
-    static arma::mat rotNO(arma::mat const& cc)
+    static arma::mat rotNO(arma::mat const& cc, int nExclude=2)
     {
+        arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
         arma::mat evec;
         arma::vec eval;
-        arma::eig_sym(eval,evec,cc);
+        arma::eig_sym(eval,evec,cc1);
         arma::vec eval2(eval.size());
         for(auto i=0u; i<eval.size(); i++)
             eval2[i]=-std::min(eval[i], -eval[i]+1);
         arma::uvec iev=arma::sort_index(eval2);
         eval(iev).print("evals");
-        return evec.cols(iev);
+        arma::mat rot(cc.n_rows,cc.n_cols,arma::fill::eye);
+        rot.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1)=evec.cols(iev);
+        return rot;
     }
 
-    static arma::mat rotNO2(arma::mat const& cc, double tolWannier=1e-5)
+    static arma::mat rotNO2(arma::mat const& cc, int nExclude=2, double tolWannier=1e-5)
     {
         using namespace arma;
+        arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
         arma::mat evec;
         arma::vec eval;
-        arma::eig_sym(eval,evec,cc);
+        arma::eig_sym(eval,evec,cc1);
         arma::vec eval2(eval.size());
         for(auto i=0u; i<eval.size(); i++)
             eval2[i]=-std::min(eval[i], -eval[i]+1);    //activity sorting
@@ -169,7 +175,9 @@ struct Fermionic {
             evec4.cols(ieval0) = evec3.cols(ieval0) * wevec;
         }
 
-        return evec4;
+        arma::mat rot(cc.n_rows,cc.n_cols,arma::fill::eye);
+        rot.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1)=evec4;
+        return rot;
     }
 
     static HamSysExact rotOpExact(arma::mat const& rot)

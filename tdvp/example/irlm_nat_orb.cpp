@@ -65,7 +65,7 @@ State rotateState2(itensor::MPS psi2, arma::mat const& rot, double dt=0.01)
     return {psi2, sys.sites};
 }
 
-State rotateState3(itensor::MPS psi, arma::mat const& rot)
+State rotateState3(itensor::MPS psi, arma::mat const& rot, arma::vec const& ni, int nExclude=2)
 {
 //    const auto im=arma::cx_double(0,1);
     arma::mat rott=rot.t();
@@ -95,13 +95,13 @@ State rotateState3(itensor::MPS psi, arma::mat const& rot)
 //    }
     itensor::Fermion sites(psi.length(), {"ConserveNf=",false});
     psi.replaceSiteInds(sites.inds());
-    cout<<"it m(psi2) m(psi)\n";
+    //cout<<"it m(psi2) m(psi)\n";
     for(auto a=0u; a<psi.length(); a++) {
-        if (std::abs(eval(a))<1e-14) continue;
         if (std::abs(eval(a)-1.0)<1e-14) continue;
+        if (std::abs(ni(a))<1e-14) continue;
         itensor::AutoMPO ampo(sites);
-        for(auto i=0; i<psi.length(); i++)
-            for(auto j=0; j<psi.length(); j++)
+        for(auto i=2; i<psi.length(); i++)
+            for(auto j=2; j<psi.length(); j++)
                 ampo += std::conj(evec(j,a))*evec(i,a),"Cdag",i+1,"C",j+1;
         auto ha=itensor::toMPO(ampo);
         if (itensor::maxLinkDim(ha)>4) cout<<"no bond dim 4 in mpo\n";
@@ -109,7 +109,7 @@ State rotateState3(itensor::MPS psi, arma::mat const& rot)
         psi2.noPrime();
         psi=itensor::sum(psi, psi2*(eval(a)-1.0));
         psi.noPrime();
-        cout<<a<<" "<<itensor::maxLinkDim(psi2)<<" "<<itensor::maxLinkDim(psi)<<"\n";
+        //cout<<a<<" "<<itensor::maxLinkDim(psi2)<<" "<<itensor::maxLinkDim(psi)<<"\n";
     }
 
     return {psi, sites};
@@ -140,11 +140,11 @@ auto computeGS(HamSys const& sys)
 
 int main()
 {
-    int len=10;
+    int len=20;
 
     cout<<"\n-------------------------- solve the gs of system ----------------\n";
 
-    auto model1=IRLM {.L=len, .t=0.5, .V=0.15, .U=-0.5};
+    auto model1=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=-10};
     auto rot=model1.rotStar();
     //eig_unitary(rot);
     //return 0;
@@ -155,8 +155,8 @@ int main()
 
     auto cc=Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites);
     cc.diag().print("ni");
-    rot = rot*Fermionic::rotNO(cc);
-    auto sys1b=model1.Ham(rot);
+    rot = rot*Fermionic::rotNO2(cc);
+    auto sys1b=model1.Ham(rot,true);
     auto sol1b=computeGS(sys1b);
 
     auto psi1=sol1b.psi;
@@ -167,15 +167,16 @@ int main()
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
 
-    auto model2=IRLM {.L=len, .t=0.5, .V=0.15, .U=-0.5};
+    auto model2=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=0.0};
 
-    cout<<"time M m energy n0\n" << setprecision(12);
+    ofstream out("irlm_no_L"s+to_string(len)+".txt");
+    out<<"time M m energy n0\n" << setprecision(12);
     double n0=itensor::expectC(sol1b.psi, sol1b.hamsys.sites, "N",{1}).at(0).real();
-    cout<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<endl;
+    out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<endl;
     auto psi=sol1b.psi;
     for(auto i=0; i<100; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
-        auto sys2=model2.Ham(rot);
+        auto sys2=model2.Ham(rot,true);
         it_tdvp sol {sys2, psi};
         sol.dt={0,0.1};
         sol.bond_dim=256;
@@ -185,17 +186,18 @@ int main()
 
         sol.iterate();
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
-        cout<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
+        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
 
         psi=sol.psi;
         //psi.orthogonalize({"Cutoff",1e-9});
-        cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
+        cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
         cc.diag().print("ni");
         auto rot1=Fermionic::rotNO2(cc);
-        psi=rotateState3(sol.psi, rot1).psi;
-        psi.orthogonalize({"Cutoff",1e-9});
+        arma::vec ni=arma::mat(rot1.t()*cc*rot1).diag();
+        psi=rotateState3(psi, rot1, ni).psi;
+        //psi.orthogonalize({"Cutoff",1e-9});
         rot = rot*rot1;
-                for(auto i=0; i<sol.psi.length(); i++)
+        for(auto i=0; i<psi.length(); i++)
             cout<<itensor::leftLinkIndex(psi,i+1).dim()<<" ";
         cout<<endl;
     }
