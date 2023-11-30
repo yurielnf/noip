@@ -6,12 +6,13 @@
 #include <array>
 #include <itensor/all.h>
 
-auto eig_unitary(const arma::mat& A)
+auto eig_unitary(const arma::mat& A, int nExclude=2)
 {
     using namespace arma;
+    arma::mat A1=A.submat(nExclude,nExclude,A.n_rows-1,A.n_cols-1);
     cx_vec eval, eval2;
     cx_mat evec, Q, R;
-    eig_gen(eval, evec, A);
+    eig_gen(eval, evec, A1);
     qr(Q, R, evec);
     cx_mat RDR=R*diagmat(eval)*R.i();
     eval2=RDR.diag();
@@ -21,7 +22,11 @@ auto eig_unitary(const arma::mat& A)
     std::cout<<"err eig_unitary="<<err<<std::endl;
     std::cout<<"err |eval|-1="<<norm(arma::abs(eval2)-ones(A.n_cols))<<std::endl;
 #endif
-    return make_pair(eval2,Q);
+    cx_vec lambda(A.n_rows, fill::ones);
+    arma::cx_mat rot(A.n_rows,A.n_cols,fill::eye);
+    rot.submat(nExclude,nExclude,A.n_rows-1,A.n_cols-1)=Q;
+    lambda.rows(nExclude,A.n_rows-1)=eval2;
+    return make_pair(lambda,rot);
 }
 
 

@@ -70,38 +70,17 @@ State rotateState3(itensor::MPS psi, arma::mat const& rot, arma::vec const& ni, 
 //    const auto im=arma::cx_double(0,1);
     arma::mat rott=rot.t();
 
-    auto [eval,evec]=eig_unitary(rott);
-//    {// checking quality
-//        arma::cx_mat logrot;//=arma::logmat(rott);
-//        {
-//            arma::cx_mat evec;
-//            arma::cx_colvec eval;
-//            arma::eig_gen(eval,evec,rott);
-//            logrot=evec*arma::diagmat(arma::log(eval))*evec.i();
-//        }
-//        double err=arma::norm(rott-arma::expmat(logrot));
-//        if (err>1e-13) cout<<"exp error="<<err<<endl;
-//        double err_herm=norm(logrot.t()+logrot);
-//        if (err_herm>1e-13) cout<<"aHermitian error="<<err_herm<<endl;
+    auto [eval,evec]=eig_unitary(rott,nExclude);
 
-//        arma::vec eval1;
-//        arma::eig_sym(eval1,evec, logrot*im);
-//        eval=arma::exp(eval1*(-im));
-
-//        double err2=arma::norm(rott-evec*arma::diagmat(eval)*evec.t());
-//        if (err2>1e-13) cout<<"eigen error="<<err2<<endl;
-
-//        cout.flush();
-//    }
     itensor::Fermion sites(psi.length(), {"ConserveNf=",false});
     psi.replaceSiteInds(sites.inds());
     //cout<<"it m(psi2) m(psi)\n";
-    for(auto a=0u; a<psi.length(); a++) {
+    for(auto a=nExclude; a<psi.length(); a++) {
         if (std::abs(eval(a)-1.0)<1e-14) continue;
         if (std::abs(ni(a))<1e-14) continue;
         itensor::AutoMPO ampo(sites);
-        for(auto i=2; i<psi.length(); i++)
-            for(auto j=2; j<psi.length(); j++)
+        for(auto i=nExclude; i<psi.length(); i++)
+            for(auto j=nExclude; j<psi.length(); j++)
                 ampo += std::conj(evec(j,a))*evec(i,a),"Cdag",i+1,"C",j+1;
         auto ha=itensor::toMPO(ampo);
         if (itensor::maxLinkDim(ha)>4) cout<<"no bond dim 4 in mpo\n";
@@ -140,7 +119,7 @@ auto computeGS(HamSys const& sys)
 
 int main()
 {
-    int len=20;
+    int len=50, nExclude=2;
 
     cout<<"\n-------------------------- solve the gs of system ----------------\n";
 
@@ -155,8 +134,8 @@ int main()
 
     auto cc=Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites);
     cc.diag().print("ni");
-    rot = rot*Fermionic::rotNO2(cc);
-    auto sys1b=model1.Ham(rot,true);
+    rot = rot*Fermionic::rotNO2(cc,nExclude);
+    auto sys1b=model1.Ham(rot, nExclude==2);
     auto sol1b=computeGS(sys1b);
 
     auto psi1=sol1b.psi;
@@ -176,7 +155,7 @@ int main()
     auto psi=sol1b.psi;
     for(auto i=0; i<100; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
-        auto sys2=model2.Ham(rot,true);
+        auto sys2=model2.Ham(rot, nExclude==2);
         it_tdvp sol {sys2, psi};
         sol.dt={0,0.1};
         sol.bond_dim=256;
@@ -192,9 +171,9 @@ int main()
         //psi.orthogonalize({"Cutoff",1e-9});
         cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
         cc.diag().print("ni");
-        auto rot1=Fermionic::rotNO2(cc);
+        auto rot1=Fermionic::rotNO2(cc,nExclude);
         arma::vec ni=arma::mat(rot1.t()*cc*rot1).diag();
-        psi=rotateState3(psi, rot1, ni).psi;
+        psi=rotateState3(psi, rot1, ni, nExclude).psi;
         //psi.orthogonalize({"Cutoff",1e-9});
         rot = rot*rot1;
         for(auto i=0; i<psi.length(); i++)
