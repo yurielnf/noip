@@ -67,7 +67,6 @@ State rotateState2(itensor::MPS psi2, arma::mat const& rot, double dt=0.01)
 
 State rotateState3(itensor::MPS psi, arma::mat const& rot, arma::vec const& ni, int nExclude=2)
 {
-//    const auto im=arma::cx_double(0,1);
     arma::mat rott=rot.t();
 
     auto [eval,evec]=eig_unitary(rott,nExclude);
@@ -88,7 +87,7 @@ State rotateState3(itensor::MPS psi, arma::mat const& rot, arma::vec const& ni, 
         psi2.noPrime();
         psi=itensor::sum(psi, psi2*(eval(a)-1.0));
         psi.noPrime();
-        //cout<<a<<" "<<itensor::maxLinkDim(psi2)<<" "<<itensor::maxLinkDim(psi)<<"\n";
+        cout<<a<<" "<<itensor::maxLinkDim(psi2)<<" "<<itensor::maxLinkDim(psi)<<"\n";
     }
 
     return {psi, sites};
@@ -119,7 +118,7 @@ auto computeGS(HamSys const& sys)
 
 int main()
 {
-    int len=50, nExclude=2;
+    int len=20, nExclude=0;
 
     cout<<"\n-------------------------- solve the gs of system ----------------\n";
 
@@ -164,17 +163,19 @@ int main()
         sol.epsilonM=(i%10==0) ? 1e-4 : 0;
 
         sol.iterate();
-        double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
-        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
+
 
         psi=sol.psi;
         //psi.orthogonalize({"Cutoff",1e-9});
         cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
         cc.diag().print("ni");
+        double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
+        //double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
         auto rot1=Fermionic::rotNO2(cc,nExclude);
         arma::vec ni=arma::mat(rot1.t()*cc*rot1).diag();
+        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
         psi=rotateState3(psi, rot1, ni, nExclude).psi;
-        //psi.orthogonalize({"Cutoff",1e-9});
+//        psi.orthogonalize({"Cutoff",1e-9});
         rot = rot*rot1;
         for(auto i=0; i<psi.length(); i++)
             cout<<itensor::leftLinkIndex(psi,i+1).dim()<<" ";
