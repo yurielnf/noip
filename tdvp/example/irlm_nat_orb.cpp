@@ -65,7 +65,7 @@ State rotateState2(itensor::MPS psi2, arma::mat const& rot, double dt=0.01)
     return {psi2, sys.sites};
 }
 
-State rotateState3(itensor::MPS psi, arma::mat const& rot, arma::vec const& ni, int nExclude=2)
+State rotateState3(itensor::MPS psi, arma::mat const& rot, int nExclude=2)
 {
     arma::mat rott=rot.t();
 
@@ -73,10 +73,9 @@ State rotateState3(itensor::MPS psi, arma::mat const& rot, arma::vec const& ni, 
 
     itensor::Fermion sites(psi.length(), {"ConserveNf=",false});
     psi.replaceSiteInds(sites.inds());
-    //cout<<"it m(psi2) m(psi)\n";
+    cout<<"it m(psi2) m(psi)\n";
     for(auto a=nExclude; a<psi.length(); a++) {
         if (std::abs(eval(a)-1.0)<1e-14) continue;
-        if (std::abs(ni(a))<1e-14) continue;
         itensor::AutoMPO ampo(sites);
         for(auto i=nExclude; i<psi.length(); i++)
             for(auto j=nExclude; j<psi.length(); j++)
@@ -116,10 +115,11 @@ auto computeGS(HamSys const& sys)
 }
 
 
-int main()
+/// ./irlm_star <len>
+int main(int argc, char **argv)
 {
-    int len=20, nExclude=0;
-
+    int len=20, nExclude=2;
+    if (argc==2) len=atoi(argv[1]);
     cout<<"\n-------------------------- solve the gs of system ----------------\n";
 
     auto model1=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=-10};
@@ -164,35 +164,21 @@ int main()
 
         sol.iterate();
 
-
         psi=sol.psi;
         //psi.orthogonalize({"Cutoff",1e-9});
         cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
         cc.diag().print("ni");
-        double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
-        //double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
+        //double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
+        double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
         auto rot1=Fermionic::rotNO2(cc,nExclude);
-        arma::vec ni=arma::mat(rot1.t()*cc*rot1).diag();
         out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
-        psi=rotateState3(psi, rot1, ni, nExclude).psi;
-//        psi.orthogonalize({"Cutoff",1e-9});
+        psi=rotateState3(psi, rot1, nExclude).psi;
+        psi.orthogonalize({"Cutoff",1e-9});
         rot = rot*rot1;
         for(auto i=0; i<psi.length(); i++)
             cout<<itensor::leftLinkIndex(psi,i+1).dim()<<" ";
         cout<<endl;
     }
-
-//    psi.replaceSiteInds(sys2.sites.inds());
-//    cc=Fermionic::cc_matrix(psi, sys2.sites);
-//    cc.diag().print("ni");
-//    auto rot1=Fermionic::rotNO2(cc);
-//    State st=rotateState(psi,rot1);
-//    cc=Fermionic::cc_matrix(st.psi, st.sites);
-
-//    auto sys=model2.Ham(rot*rot1);
-//    psi=st.psi;
-//    psi.replaceSiteInds(sys.sites.inds());
-//    cout<<"energy="<<std::real(itensor::innerC(psi, sys.ham, psi))<<endl;
 
     return 0;
 }
