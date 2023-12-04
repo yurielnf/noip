@@ -185,6 +185,92 @@ struct Fermionic {
         return rot;
     }
 
+    static arma::mat rotNO3(arma::mat const& cc, int nExclude=2, double tolWannier=1e-5)
+    {
+        using namespace arma;
+        arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
+        arma::mat evec;
+        arma::vec eval;
+        arma::eig_sym(eval,evec,cc1);
+        arma::vec activity(eval.size());
+        for(auto i=0u; i<eval.size(); i++)
+            activity[i]=-std::min(eval[i], -eval[i]+1);    //activity sorting
+        arma::uvec iev=arma::stable_sort_index(activity);
+        eval(iev).print("evals");
+
+        arma::vec eval2=eval(iev);
+        arma::mat evec2=evec.cols(iev);
+
+        // Wannier after activity sorting
+        arma::mat J=arma::diagmat(arma::regspace(0,eval.size()-1));
+        size_t neval0;
+        uvec weval;
+        arma::vec Xeval;
+        arma::mat Xevec;
+
+        {// group empty natural orbitals
+            std::vector<size_t> ieval0v;
+            for(auto i=0u; i<eval2.size(); i++)
+                if (eval2[i]<tolWannier) ieval0v.push_back(i);
+            uvec ieval0=conv_to<uvec>::from(ieval0v);
+            arma::mat evec0=evec2.cols(ieval0);
+            arma::mat X=evec0.t()* J * evec0;
+            arma::vec Xeval0;
+            arma::mat Xevec0;
+            arma::eig_sym(Xeval0,Xevec0,X);
+
+            weval=ieval0;
+            Xeval=Xeval0;
+            Xevec=Xevec0;
+            neval0=weval.size();
+        }
+        {// group full natural orbitals
+            std::vector<size_t> ieval1v;
+            for(auto i=0u; i<eval.size(); i++)
+                if (std::abs(1.0-eval[iev[i]])<tolWannier) ieval1v.push_back(i);
+            uvec ieval1=conv_to<uvec>::from(ieval1v);
+            arma::mat evec1=evec2.cols(ieval1);
+            arma::mat X=evec1.t()* J * evec1;
+            arma::vec Xeval1;
+            arma::mat Xevec1;
+            arma::eig_sym(Xeval1,Xevec1,X);
+
+            weval=join_vert(weval,ieval1);
+            Xeval=join_vert(Xeval,Xeval1);
+            arma::mat rot(Xeval.size(), Xeval.size(), fill::zeros); // tensor addition of the two rotations
+            rot.submat(0,0,Xevec.n_rows-1,Xevec.n_cols-1)=Xevec;
+            rot.submat(Xevec.n_rows,Xevec.n_cols,rot.n_rows-1,rot.n_cols-1)=Xevec1;
+            Xevec=rot;
+        }
+
+        // apply Wannierization
+        arma::vec eval3=eval2;
+        arma::mat evec3=evec2;
+        evec3.cols(weval) = evec2.cols(weval) * Xevec;
+
+        // sort Wanier orbitals according to position
+        arma::uvec Xiev(Xeval.size());
+        {
+            Xiev=arma::sort_index(Xeval);
+            for(auto i=0u; i<Xeval.size(); i++) Xiev[i]=i;
+//            int c=0;
+//            for(auto i=0u; i<neval0; i++) Xiev[2*i]=i;
+//            for(auto i=0; i+neval0<Xeval.size(); i++)
+//                if (i<2*neval0) Xiev[2*i+1]=i+neval0;
+//                else Xiev[2*neval0+c++]=i+neval0;
+        }
+        Xeval.print("orbitals position");
+
+        arma::vec eval4=eval3;
+        arma::mat evec4=evec3;
+        eval4(weval)=eval3(weval(Xiev));
+        evec4.cols(weval) = evec3.cols(weval(Xiev));
+
+        arma::mat rot(cc.n_rows,cc.n_cols,arma::fill::eye);
+        rot.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1)=evec4;
+        return rot;
+    }
+
     static HamSysExact rotOpExact(arma::mat const& rot)
     {
         arma::mat rott=rot.t();

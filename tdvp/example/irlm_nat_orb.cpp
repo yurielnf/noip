@@ -86,7 +86,9 @@ State rotateState3(itensor::MPS psi, arma::mat const& rot, int nExclude=2)
         psi2.noPrime();
         psi=itensor::sum(psi, psi2*(eval(a)-1.0));
         psi.noPrime();
+        psi.orthogonalize({"Cutoff",1e-9});
         cout<<a<<" "<<itensor::maxLinkDim(psi2)<<" "<<itensor::maxLinkDim(psi)<<"\n";
+        cout.flush();
     }
 
     return {psi, sites};
@@ -99,7 +101,7 @@ auto computeGS(HamSys const& sys)
     sol_gs.bond_dim=64;
     sol_gs.noise=1e-5;
     cout<<"\nsweep bond-dim energy\n";
-    for(auto i=0u; i<10; i++) {
+    for(auto i=0u; i<4; i++) {
         if (i==3) {
             sol_gs.noise=1e-10;
 //            sol_gs.nIter_diag=2;
@@ -118,7 +120,7 @@ auto computeGS(HamSys const& sys)
 /// ./irlm_star <len>
 int main(int argc, char **argv)
 {
-    int len=20, nExclude=2;
+    int len=30, nExclude=2;
     if (argc==2) len=atoi(argv[1]);
     cout<<"\n-------------------------- solve the gs of system ----------------\n";
 
@@ -133,9 +135,12 @@ int main(int argc, char **argv)
 
     auto cc=Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites);
     cc.diag().print("ni");
-    rot = rot*Fermionic::rotNO2(cc,nExclude);
+    rot = rot*Fermionic::rotNO3(cc,nExclude);
     auto sys1b=model1.Ham(rot, nExclude==2);
     auto sol1b=computeGS(sys1b);
+    cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites);
+    cc.diag().print("ni");
+
 
     auto psi1=sol1b.psi;
     psi1.orthogonalize({"Cutoff",1e-9});
@@ -170,7 +175,7 @@ int main(int argc, char **argv)
         cc.diag().print("ni");
         //double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
-        auto rot1=Fermionic::rotNO2(cc,nExclude);
+        auto rot1=Fermionic::rotNO3(cc,nExclude);
         out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
         psi=rotateState3(psi, rot1, nExclude).psi;
         psi.orthogonalize({"Cutoff",1e-9});
