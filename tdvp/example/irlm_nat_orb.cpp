@@ -84,9 +84,11 @@ State rotateState3(itensor::MPS psi, arma::mat const& rot, int nExclude=2)
         if (itensor::maxLinkDim(ha)>4) cout<<"no bond dim 4 in mpo\n";
         auto psi2=itensor::applyMPO(ha, psi);
         psi2.noPrime();
-        psi=itensor::sum(psi, psi2*(eval(a)-1.0));
-        psi.noPrime();
-        psi.orthogonalize({"Cutoff",1e-9});
+        if (itensor::norm(psi2)*std::abs(eval(a)-1.0)>1e-14) {
+            psi=itensor::sum(psi, psi2*(eval(a)-1.0));
+            psi.noPrime();
+            psi.orthogonalize({"Cutoff",1e-9});
+        }
         cout<<a<<" "<<itensor::maxLinkDim(psi2)<<" "<<itensor::maxLinkDim(psi)<<"\n";
         cout.flush();
     }
@@ -157,7 +159,7 @@ int main(int argc, char **argv)
     double n0=itensor::expectC(sol1b.psi, sol1b.hamsys.sites, "N",{1}).at(0).real();
     out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<endl;
     auto psi=sol1b.psi;
-    for(auto i=0; i<100; i++) {
+    for(auto i=0; i<len*10/2; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         auto sys2=model2.Ham(rot, nExclude==2);
         it_tdvp sol {sys2, psi};
