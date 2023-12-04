@@ -195,7 +195,7 @@ struct Fermionic {
         arma::vec activity(eval.size());
         for(auto i=0u; i<eval.size(); i++)
             activity[i]=-std::min(eval[i], -eval[i]+1);    //activity sorting
-        arma::uvec iev=arma::stable_sort_index(activity);
+        arma::uvec iev=arma::stable_sort_index(activity.clean(1e-14));
         eval(iev).print("evals");
 
         arma::vec eval2=eval(iev);
