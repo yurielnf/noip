@@ -22,10 +22,14 @@ auto eig_unitary(const arma::mat& A, int nExclude=2)
     std::cout<<"err eig_unitary="<<err<<std::endl;
     std::cout<<"err |eval|-1="<<norm(arma::abs(eval2)-ones(A.n_cols))<<std::endl;
 #endif
+    arma::mat J=arma::diagmat(arma::regspace(0,eval2.size()-1));
+    arma::cx_mat X=Q.t() * J * Q;
+    arma::vec Xeval=arma::real(X.diag());
+    uvec Xiev=arma::stable_sort_index(Xeval);
     cx_vec lambda(A.n_rows, fill::ones);
     arma::cx_mat rot(A.n_rows,A.n_cols,fill::eye);
-    rot.submat(nExclude,nExclude,A.n_rows-1,A.n_cols-1)=Q;
-    lambda.rows(nExclude,A.n_rows-1)=eval2;
+    rot.submat(nExclude,nExclude,A.n_rows-1,A.n_cols-1)=Q.cols(Xiev);
+    lambda.rows(nExclude,A.n_rows-1)=eval2(Xiev);
     return make_pair(lambda,rot);
 }
 
@@ -251,15 +255,15 @@ struct Fermionic {
         // sort Wanier orbitals according to position
         arma::uvec Xiev(Xeval.size());
         {
-            Xiev=arma::sort_index(Xeval);
-            for(auto i=0u; i<Xeval.size(); i++) Xiev[i]=i;
+            Xiev=arma::stable_sort_index(Xeval);
+            //for(auto i=0u; i<Xeval.size(); i++) Xiev[i]=i;
 //            int c=0;
 //            for(auto i=0u; i<neval0; i++) Xiev[2*i]=i;
 //            for(auto i=0; i+neval0<Xeval.size(); i++)
 //                if (i<2*neval0) Xiev[2*i+1]=i+neval0;
 //                else Xiev[2*neval0+c++]=i+neval0;
         }
-        Xeval.print("orbitals position");
+        //Xeval.print("orbitals position");
 
         arma::vec eval4=eval3;
         arma::mat evec4=evec3;
@@ -294,13 +298,13 @@ struct Fermionic {
         return {sites, h};
     }
 
-    static HamSys rotOp(arma::mat const& rot)
+    static HamSys rotOp(arma::mat const& rot, int nExclude=2)
     {
         arma::mat rott=rot.t();
         arma::cx_mat logrot;
         const auto im=arma::cx_double(0,1);
         {
-            auto [eval,evec]=eig_unitary(rott);
+            auto [eval,evec]=eig_unitary(rott, nExclude);
             logrot=evec*arma::diagmat(arma::log(eval)*im)*evec.t();
 
             double err=arma::norm(rott-arma::expmat(-im*logrot));
@@ -311,7 +315,7 @@ struct Fermionic {
         }
         arma::cx_mat kin=logrot; //arma::logmat(rott)*im; // we need to invert the rotation
         auto L=rot.n_cols;
-        itensor::Fermion sites(L, {"ConserveNf=",true});
+        itensor::Fermion sites(L, {"ConserveNf=",false});
         itensor::AutoMPO h(sites);
         for(int i=0;i<L; i++)
             for(int j=0;j<L; j++)

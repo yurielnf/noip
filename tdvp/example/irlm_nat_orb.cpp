@@ -13,14 +13,15 @@ struct State {
     itensor::Fermion sites;
 };
 
-State rotateState(itensor::MPS psi, arma::mat const& rot)
+State rotateState(itensor::MPS psi, arma::mat const& rot, int nExclude)
 {
-    auto sys3=Fermionic::rotOp(rot);
+    auto sys3=Fermionic::rotOp(rot, nExclude);
     it_tdvp sol {sys3, psi};
     sol.dt={0,0.01};
-    sol.err_goal=1e-7;
-//    sol.noise=1e-10;
-    sol.bond_dim=128;
+    sol.bond_dim=256;
+    sol.rho_cutoff=1e-14;
+    sol.silent=true;
+    sol.epsilonM=0e-4;
 //    sol.psi.orthogonalize({"Cutoff",1e-9});
     for(auto i=0; i<sol.psi.length(); i++)
         cout<<itensor::leftLinkIndex(sol.psi,i+1).dim()<<" ";
@@ -29,12 +30,12 @@ State rotateState(itensor::MPS psi, arma::mat const& rot)
         sol.iterate();
         if (i==2) sol.epsilonM=0;
         if ((i+1)*sol.dt.imag()>=1.0) {
-//            sol.psi.orthogonalize({"Cutoff",1e-9});
+            sol.psi.orthogonalize({"Cutoff",1e-9});
             for(auto i=0; i<sol.psi.length(); i++)
                 cout<<itensor::leftLinkIndex(sol.psi,i+1).dim()<<" ";
             cout<<endl;
         }
-        //cout<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys3.ham) <<" "<<maxLinkDim(sol.psi)<<endl;
+        cout<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys3.ham) <<" "<<maxLinkDim(sol.psi)<<endl;
     }
     auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
     cc.diag().print("ni");
@@ -74,13 +75,13 @@ State rotateState3(itensor::MPS psi, arma::mat const& rot, int nExclude=2)
     itensor::Fermion sites(psi.length(), {"ConserveNf=",false});
     psi.replaceSiteInds(sites.inds());
     cout<<"it m(psi2) m(psi)\n";
-    for(auto a=nExclude; a<psi.length(); a++) {
+    for(auto a=psi.length()-1; a>=nExclude; a--) {
         if (std::abs(eval(a)-1.0)<1e-14) continue;
         itensor::AutoMPO ampo(sites);
         for(auto i=nExclude; i<psi.length(); i++)
             for(auto j=nExclude; j<psi.length(); j++)
                 ampo += std::conj(evec(j,a))*evec(i,a),"Cdag",i+1,"C",j+1;
-        auto ha=itensor::toMPO(ampo);
+        auto ha=itensor::toMPO(ampo,{"Cutoff",1e-12});
         if (itensor::maxLinkDim(ha)>4) cout<<"no bond dim 4 in mpo\n";
         auto psi2=itensor::applyMPO(ha, psi);
         psi2.noPrime();
@@ -122,7 +123,7 @@ auto computeGS(HamSys const& sys)
 /// ./irlm_star <len>
 int main(int argc, char **argv)
 {
-    int len=30, nExclude=2;
+    int len=50, nExclude=2;
     if (argc==2) len=atoi(argv[1]);
     cout<<"\n-------------------------- solve the gs of system ----------------\n";
 

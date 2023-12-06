@@ -55,7 +55,7 @@ struct it_tdvp {
                        "DoNormalize", do_normalize,
                        "Quiet",true,
                        "Silent",silent,
-                       "NumCenter",2,
+                       "NumCenter",1,
                        "ErrGoal", err_goal});
 
         nsweep++;
