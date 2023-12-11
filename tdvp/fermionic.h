@@ -230,8 +230,8 @@ struct Fermionic {
         }
         {// group full natural orbitals
             std::vector<size_t> ieval1v;
-            for(auto i=0u; i<eval.size(); i++)
-                if (std::abs(1.0-eval[iev[i]])<tolWannier) ieval1v.push_back(i);
+            for(auto i=0u; i<eval2.size(); i++)
+                if (std::abs(1.0-eval2[i])<tolWannier) ieval1v.push_back(i);
             uvec ieval1=conv_to<uvec>::from(ieval1v);
             arma::mat evec1=evec2.cols(ieval1);
             arma::mat X=evec1.t()* J * evec1;
@@ -255,23 +255,27 @@ struct Fermionic {
         // sort Wanier orbitals according to position
         arma::uvec Xiev(Xeval.size());
         {
-            Xiev=arma::stable_sort_index(Xeval);
-            //for(auto i=0u; i<Xeval.size(); i++) Xiev[i]=i;
+            //Xiev=arma::stable_sort_index(Xeval);
+            for(auto i=0u; i<Xeval.size(); i++) Xiev[i]=i;
 //            int c=0;
 //            for(auto i=0u; i<neval0; i++) Xiev[2*i]=i;
 //            for(auto i=0; i+neval0<Xeval.size(); i++)
 //                if (i<2*neval0) Xiev[2*i+1]=i+neval0;
 //                else Xiev[2*neval0+c++]=i+neval0;
-        }
-        //Xeval.print("orbitals position");
+        }        
 
         arma::vec eval4=eval3;
         arma::mat evec4=evec3;
-        eval4(weval)=eval3(weval(Xiev));
-        evec4.cols(weval) = evec3.cols(weval(Xiev));
+        eval4(arma::sort(weval))=eval3(weval(Xiev));
+        evec4.cols(arma::sort(weval)) = evec3.cols(weval(Xiev));
 
         arma::mat rot(cc.n_rows,cc.n_cols,arma::fill::eye);
         rot.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1)=evec4;
+
+        eval4.print("eval cicj");
+        Xeval(Xiev).print("orbitals position");
+        evec4.print("rotation");
+
         return rot;
     }
 
