@@ -72,8 +72,8 @@ State rotateState3(itensor::MPS psi, arma::mat const& rot, int nExclude=2)
 
     auto [eval,evec]=eig_unitary(rott,nExclude);
 
-    auto im=std::complex(0.,1.);
-    arma::cx_mat(evec*diagmat(arma::log(eval)*im)*evec.t()).clean(1e-5).print("rotHam");
+//    auto im=std::complex(0.,1.);
+//    arma::cx_mat(evec*diagmat(arma::log(eval)*im)*evec.t()).clean(1e-5).print("rotHam");
 
     itensor::Fermion sites(psi.length(), {"ConserveNf=",false});
     psi.replaceSiteInds(sites.inds());
@@ -126,7 +126,7 @@ auto computeGS(HamSys const& sys)
 /// ./irlm_star <len>
 int main(int argc, char **argv)
 {
-    int len=10, nExclude=2;
+    int len=50, nExclude=2;
     if (argc==2) len=atoi(argv[1]);
     cout<<"\n-------------------------- solve the gs of system ----------------\n";
 
@@ -163,13 +163,13 @@ int main(int argc, char **argv)
     double n0=itensor::expectC(sol1b.psi, sol1b.hamsys.sites, "N",{1}).at(0).real();
     out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<endl;
     auto psi=sol1b.psi;
-    for(auto i=0; i<1/*len*10/2*/; i++) {
+    for(auto i=0; i<len*10/2; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         auto sys2=model2.Ham(rot, nExclude==2);
         it_tdvp sol {sys2, psi};
         sol.dt={0,0.1};
         sol.bond_dim=256;
-        sol.rho_cutoff=0e-14;
+        sol.rho_cutoff=1e-14;
         sol.silent=false;
         sol.epsilonM=(i%10==0) ? 1e-4 : 0;
 
