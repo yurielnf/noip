@@ -255,8 +255,8 @@ struct Fermionic {
         // sort Wanier orbitals according to position
         arma::uvec Xiev(Xeval.size());
         {
-            Xiev=arma::stable_sort_index(Xeval);
-//            for(auto i=0u; i<Xeval.size(); i++) Xiev[i]=i;
+//            Xiev=arma::stable_sort_index(Xeval);
+            for(auto i=0u; i<Xeval.size(); i++) Xiev[i]=i;
 //            int c=0;
 //            for(auto i=0u; i<neval0; i++) Xiev[2*i]=i;
 //            for(auto i=0; i+neval0<Xeval.size(); i++)
