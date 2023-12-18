@@ -86,7 +86,7 @@ State rotateState3(itensor::MPS psi, arma::mat const& rot, int nExclude=2)
                 ampo += std::conj(evec(j,a))*evec(i,a),"Cdag",i+1,"C",j+1;
         auto ha=itensor::toMPO(ampo,{"Cutoff",1e-14});
         if (itensor::maxLinkDim(ha)>4) cout<<"no bond dim 4 in mpo\n";
-        auto psi2=itensor::applyMPO(ha, psi);
+        auto psi2=itensor::applyMPO(ha, psi, {"Cutoff",1e-10});
         psi2.noPrime();
         if (itensor::norm(psi2)*std::abs(eval(a)-1.0)>1e-14) {
             psi=itensor::sum(psi, psi2*(eval(a)-1.0));
@@ -181,7 +181,7 @@ int main(int argc, char **argv)
         cc.diag().print("ni");
         //double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
-        auto rot1=Fermionic::rotNO3(cc,nExclude,1e-5);
+        auto rot1=Fermionic::rotNO3(cc,nExclude,1e-5,8);
         out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
         psi=rotateState3(psi, rot1, nExclude).psi;
         psi.orthogonalize({"Cutoff",1e-9});
