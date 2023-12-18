@@ -181,7 +181,7 @@ int main(int argc, char **argv)
         cc.diag().print("ni");
         //double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
-        auto rot1=Fermionic::rotNO3(cc,nExclude);
+        auto rot1=Fermionic::rotNO3(cc,nExclude,1e-5);
         out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
         psi=rotateState3(psi, rot1, nExclude).psi;
         psi.orthogonalize({"Cutoff",1e-9});

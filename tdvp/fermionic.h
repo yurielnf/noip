@@ -130,10 +130,10 @@ struct Fermionic {
         arma::mat evec;
         arma::vec eval;
         arma::eig_sym(eval,evec,cc1);
-        arma::vec eval2(eval.size());
+        arma::vec activity(eval.size());
         for(auto i=0u; i<eval.size(); i++)
-            eval2[i]=-std::min(eval[i], -eval[i]+1);
-        arma::uvec iev=arma::sort_index(eval2);
+            activity[i]=-std::min(eval[i], -eval[i]+1);
+        arma::uvec iev=arma::stable_sort_index(activity.clean(1e-14));
         eval(iev).print("evals");
         arma::mat rot(cc.n_rows,cc.n_cols,arma::fill::eye);
         rot.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1)=evec.cols(iev);
@@ -189,8 +189,9 @@ struct Fermionic {
         return rot;
     }
 
-    static arma::mat rotNO3(arma::mat const& cc, int nExclude=2, double tolWannier=1e-5)
+    static arma::mat rotNO3(arma::mat const& cc, int nExclude=2, double tolWannier=1e-5, double maxBlock=0)
     {
+        if (maxBlock==0) maxBlock=cc.n_rows;
         using namespace arma;
         arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
         arma::mat evec;
@@ -212,10 +213,19 @@ struct Fermionic {
         arma::vec Xeval;
         arma::mat Xevec;
 
+        arma::vec x_sigma;
+        {
+            vec xi=(arma::mat {evec2.t()*J*evec2}).diag();
+            vec xi2=(arma::mat {evec2.t()*(J*J)*evec2}).diag()-arma::square(xi);
+            x_sigma=arma::sqrt(xi2.clean(tolWannier));
+        }
+        x_sigma.print("xsigma initial");
+
         {// group empty natural orbitals
             std::vector<size_t> ieval0v;
             for(auto i=0u; i<eval2.size(); i++)
-                if (eval2[i]<tolWannier) ieval0v.push_back(i);
+                if (eval2[i]<tolWannier ||
+                   (2*x_sigma[i]>maxBlock && eval2[i]<0.5)) ieval0v.push_back(i);
             uvec ieval0=conv_to<uvec>::from(ieval0v);
             arma::mat evec0=evec2.cols(ieval0);
             arma::mat X=evec0.t()* J * evec0;
@@ -231,7 +241,8 @@ struct Fermionic {
         {// group full natural orbitals
             std::vector<size_t> ieval1v;
             for(auto i=0u; i<eval2.size(); i++)
-                if (std::abs(1.0-eval2[i])<tolWannier) ieval1v.push_back(i);
+                if (std::abs(1.0-eval2[i])<tolWannier ||
+                   (2*x_sigma[i]>maxBlock && eval2[i]>=0.5)) ieval1v.push_back(i);
             uvec ieval1=conv_to<uvec>::from(ieval1v);
             arma::mat evec1=evec2.cols(ieval1);
             arma::mat X=evec1.t()* J * evec1;
@@ -255,8 +266,8 @@ struct Fermionic {
         // sort Wanier orbitals according to position
         arma::uvec Xiev(Xeval.size());
         {
-//            Xiev=arma::stable_sort_index(Xeval);
-            for(auto i=0u; i<Xeval.size(); i++) Xiev[i]=i;
+            Xiev=arma::stable_sort_index(Xeval);
+//            for(auto i=0u; i<Xeval.size(); i++) Xiev[i]=i;
 //            int c=0;
 //            for(auto i=0u; i<neval0; i++) Xiev[2*i]=i;
 //            for(auto i=0; i+neval0<Xeval.size(); i++)
@@ -274,7 +285,13 @@ struct Fermionic {
 
 //        eval4.print("eval cicj");
 //        Xeval(Xiev).print("orbitals position");
-//        evec4.print("rotation");
+        evec4.print("rotation");
+        {
+            vec xi=(arma::mat {evec4.t()*J*evec4}).diag();
+            vec xi2=(arma::mat {evec4.t()*(J*J)*evec4}).diag()-arma::square(xi);
+            x_sigma=arma::sqrt(xi2.clean(tolWannier));
+        }
+        x_sigma.print("xsigma final");
 
         return rot;
     }
