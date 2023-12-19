@@ -16,6 +16,13 @@ auto eig_unitary(const arma::mat& A, int nExclude=2)
     qr(Q, R, evec);
     cx_mat RDR=R*diagmat(eval)*R.i();
     eval2=RDR.diag();
+
+//    // fix the sign
+//    for(auto j=0u; j<Q.n_cols; j++) {
+//        auto i=arma::index_max(arma::abs(Q.col(j)));
+//        Q.col(j) /= arma::sign(Q(i,j));
+//    }
+
 #ifndef NDEBUG
     double err=norm(A-Q*diagmat(eval2)*Q.t());
     std::cout<<"error diag RDR="<<norm(RDR-diagmat(eval))<<std::endl;
@@ -219,7 +226,7 @@ struct Fermionic {
             vec xi2=(arma::mat {evec2.t()*(J*J)*evec2}).diag()-arma::square(xi);
             x_sigma=arma::sqrt(xi2.clean(tolWannier));
         }
-        x_sigma.print("xsigma initial");
+        //x_sigma.print("xsigma initial");
 
         {// group empty natural orbitals
             std::vector<size_t> ieval0v;
@@ -285,13 +292,19 @@ struct Fermionic {
 
 //        eval4.print("eval cicj");
 //        Xeval(Xiev).print("orbitals position");
-        evec4.print("rotation");
+//        evec4.print("rotation");
         {
             vec xi=(arma::mat {evec4.t()*J*evec4}).diag();
-            vec xi2=(arma::mat {evec4.t()*(J*J)*evec4}).diag()-arma::square(xi);
-            x_sigma=arma::sqrt(xi2.clean(tolWannier));
+            vec xi2=(arma::mat {evec4.t()*(J-diagmat(xi)) * (J-diagmat(xi))*evec4}).diag();
+            x_sigma=arma::sqrt(xi2.clean(1e-15));
+            arma::join_horiz(xi,x_sigma).print("<X> sigmaX");
         }
-        x_sigma.print("xsigma final");
+
+        // fix the sign
+        for(auto j=0u; j<rot.n_cols; j++) {
+            auto i=arma::index_max(arma::abs(rot.col(j)));
+            rot.col(j) /= arma::sign(rot(i,j));
+        }
 
         return rot;
     }
@@ -326,15 +339,22 @@ struct Fermionic {
         const auto im=arma::cx_double(0,1);
         {
             auto [eval,evec]=eig_unitary(rott, nExclude);
-            logrot=evec*arma::diagmat(arma::log(eval)*im)*evec.t();
-
-            double err=arma::norm(rott-arma::expmat(-im*logrot));
+            arma::cx_vec logeval=-arma::log(eval)*im;
+            for(auto& x : logeval) { // fix sign of the
+                if (std::real(x)>M_PI/2) x -= M_PI;
+                else if (std::real(x)<-M_PI/2) x += M_PI;
+            }
+            logrot=evec*arma::diagmat(logeval)*evec.t();
+            if (norm(logeval)>0.1) logeval.print("log(eval)");
+            double err=arma::norm(rott-arma::expmat(im*logrot));
             if (err>1e-13) std::cout<<"exp error="<<err<<std::endl;
 
             double err_herm=norm(logrot.t()-logrot);
             if (err_herm>1e-13) std::cout<<"Hermitian error="<<err_herm<<std::endl;
         }
         arma::cx_mat kin=logrot; //arma::logmat(rott)*im; // we need to invert the rotation
+
+        if (norm(kin)>0.1) kin.clean(1e-4).print("kin");
         auto L=rot.n_cols;
         itensor::Fermion sites(L, {"ConserveNf=",false});
         itensor::AutoMPO h(sites);

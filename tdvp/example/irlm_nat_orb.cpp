@@ -17,7 +17,7 @@ State rotateState(itensor::MPS psi, arma::mat const& rot, int nExclude)
 {
     auto sys3=Fermionic::rotOp(rot, nExclude);
     it_tdvp sol {sys3, psi};
-    sol.dt={0,0.01};
+    sol.dt={0,1};
     sol.bond_dim=256;
     sol.rho_cutoff=1e-14;
     sol.silent=true;
@@ -37,8 +37,8 @@ State rotateState(itensor::MPS psi, arma::mat const& rot, int nExclude)
         }
         cout<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys3.ham) <<" "<<maxLinkDim(sol.psi)<<endl;
     }
-    auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
-    cc.diag().print("ni");
+//    auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
+//    cc.diag().print("ni");
     return {sol.psi, sol.hamsys.sites};
 }
 
@@ -83,7 +83,7 @@ State rotateState3(itensor::MPS psi, arma::mat const& rot, int nExclude=2)
         itensor::AutoMPO ampo(sites);
         for(auto i=nExclude; i<psi.length(); i++)
             for(auto j=nExclude; j<psi.length(); j++)
-                ampo += std::conj(evec(j,a))*evec(i,a),"Cdag",i+1,"C",j+1;
+                ampo += evec(i,a)*std::conj(evec(j,a)),"Cdag",i+1,"C",j+1;
         auto ha=itensor::toMPO(ampo,{"Cutoff",1e-14});
         if (itensor::maxLinkDim(ha)>4) cout<<"no bond dim 4 in mpo\n";
         auto psi2=itensor::applyMPO(ha, psi, {"Cutoff",1e-10});
@@ -126,7 +126,7 @@ auto computeGS(HamSys const& sys)
 /// ./irlm_star <len>
 int main(int argc, char **argv)
 {
-    int len=50, nExclude=2;
+    int len=20, nExclude=2;
     if (argc==2) len=atoi(argv[1]);
     cout<<"\n-------------------------- solve the gs of system ----------------\n";
 
@@ -181,7 +181,7 @@ int main(int argc, char **argv)
         cc.diag().print("ni");
         //double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
-        auto rot1=Fermionic::rotNO3(cc,nExclude,1e-5,8);
+        auto rot1=Fermionic::rotNO3(cc,nExclude,1e-5/*,8*/);
         out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
         psi=rotateState3(psi, rot1, nExclude).psi;
         psi.orthogonalize({"Cutoff",1e-9});
