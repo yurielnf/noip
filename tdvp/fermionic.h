@@ -196,14 +196,16 @@ struct Fermionic {
         return rot;
     }
 
+//    static arma::mat rotNO3(arma::mat const& cc, int nExclude=2, int nActive=8, double maxBlock=0)
     static arma::mat rotNO3(arma::mat const& cc, int nExclude=2, double tolWannier=1e-5, double maxBlock=0)
     {
         if (maxBlock==0) maxBlock=cc.n_rows;
         using namespace arma;
         arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
+        arma::mat J=arma::diagmat(arma::regspace(0,cc1.n_rows-1));
         arma::mat evec;
         arma::vec eval;
-        arma::eig_sym(eval,evec,cc1);
+        arma::eig_sym(eval,evec,cc1);  // +1e-5/cc1.n_rows*J
         arma::vec activity(eval.size());
         for(auto i=0u; i<eval.size(); i++)
             activity[i]=-std::min(eval[i], -eval[i]+1);    //activity sorting
@@ -213,8 +215,7 @@ struct Fermionic {
         arma::vec eval2=eval(iev);
         arma::mat evec2=evec.cols(iev);
 
-        // Wannier after activity sorting
-        arma::mat J=arma::diagmat(arma::regspace(0,eval.size()-1));
+        // Wannier after activity sorting        
         size_t neval0;
         uvec weval;
         arma::vec Xeval;
@@ -223,8 +224,8 @@ struct Fermionic {
         arma::vec x_sigma;
         {
             vec xi=(arma::mat {evec2.t()*J*evec2}).diag();
-            vec xi2=(arma::mat {evec2.t()*(J*J)*evec2}).diag()-arma::square(xi);
-            x_sigma=arma::sqrt(xi2.clean(tolWannier));
+            vec xi2=(arma::mat {evec2.t()*(J-diagmat(xi)) * (J-diagmat(xi))*evec2}).diag();
+            x_sigma=arma::sqrt(xi2.clean(1e-15));
         }
         //x_sigma.print("xsigma initial");
 
@@ -232,6 +233,7 @@ struct Fermionic {
             std::vector<size_t> ieval0v;
             for(auto i=0u; i<eval2.size(); i++)
                 if (eval2[i]<tolWannier ||
+//                if ((i>=nActive && eval2[i]<0.5) ||
                    (2*x_sigma[i]>maxBlock && eval2[i]<0.5)) ieval0v.push_back(i);
             uvec ieval0=conv_to<uvec>::from(ieval0v);
             arma::mat evec0=evec2.cols(ieval0);
@@ -249,6 +251,7 @@ struct Fermionic {
             std::vector<size_t> ieval1v;
             for(auto i=0u; i<eval2.size(); i++)
                 if (std::abs(1.0-eval2[i])<tolWannier ||
+//                if ((i>=nActive && eval2[i]>=0.5) ||
                    (2*x_sigma[i]>maxBlock && eval2[i]>=0.5)) ieval1v.push_back(i);
             uvec ieval1=conv_to<uvec>::from(ieval1v);
             arma::mat evec1=evec2.cols(ieval1);
@@ -292,7 +295,7 @@ struct Fermionic {
 
 //        eval4.print("eval cicj");
 //        Xeval(Xiev).print("orbitals position");
-//        evec4.print("rotation");
+
         {
             vec xi=(arma::mat {evec4.t()*J*evec4}).diag();
             vec xi2=(arma::mat {evec4.t()*(J-diagmat(xi)) * (J-diagmat(xi))*evec4}).diag();
@@ -305,6 +308,10 @@ struct Fermionic {
             auto i=arma::index_max(arma::abs(rot.col(j)));
             rot.col(j) /= arma::sign(rot(i,j));
         }
+
+        std::cout<<"norm(1-rot)="<<arma::norm(rot-arma::mat(rot.n_rows, rot.n_cols, fill::eye))<< std::endl;
+        if ( arma::norm(rot-arma::mat(rot.n_rows, rot.n_cols, fill::eye))>0.1 )
+                       rot.print("rotation");
 
         return rot;
     }
@@ -354,7 +361,7 @@ struct Fermionic {
         }
         arma::cx_mat kin=logrot; //arma::logmat(rott)*im; // we need to invert the rotation
 
-        if (norm(kin)>0.1) kin.clean(1e-4).print("kin");
+        if (norm(kin)>0.1) kin.print("kin");
         auto L=rot.n_cols;
         itensor::Fermion sites(L, {"ConserveNf=",false});
         itensor::AutoMPO h(sites);
