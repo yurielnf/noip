@@ -215,8 +215,18 @@ struct Fermionic {
         arma::vec eval2=eval(iev);
         arma::mat evec2=evec.cols(iev);
 
-        // Wannier after activity sorting        
-        size_t neval0;
+        // fix the sign and collect distance to 1
+        arma::vec diff1(evec2.n_rows);
+        {
+            arma::mat one(evec2.n_rows, evec2.n_cols, fill::eye);
+            for(auto j=0u; j<evec2.n_cols; j++) {
+                auto i=arma::index_max(arma::abs(evec2.col(j)));
+                evec2.col(j) /= arma::sign(evec2(i,j));
+                diff1(j)=arma::norm(evec2.col(j)-one.col(j));
+            }
+        }
+
+        // Wannier after activity sorting
         uvec weval;
         arma::vec Xeval;
         arma::mat Xevec;
@@ -234,6 +244,7 @@ struct Fermionic {
             for(auto i=0u; i<eval2.size(); i++)
                 if (eval2[i]<tolWannier ||
 //                if ((i>=nActive && eval2[i]<0.5) ||
+                   (diff1[i]>1.0 && eval2[i]<0.5) ||
                    (2*x_sigma[i]>maxBlock && eval2[i]<0.5)) ieval0v.push_back(i);
             uvec ieval0=conv_to<uvec>::from(ieval0v);
             arma::mat evec0=evec2.cols(ieval0);
@@ -245,13 +256,13 @@ struct Fermionic {
             weval=ieval0;
             Xeval=Xeval0;
             Xevec=Xevec0;
-            neval0=weval.size();
         }
         {// group full natural orbitals
             std::vector<size_t> ieval1v;
             for(auto i=0u; i<eval2.size(); i++)
                 if (std::abs(1.0-eval2[i])<tolWannier ||
 //                if ((i>=nActive && eval2[i]>=0.5) ||
+                   (diff1[i]>1.0 && eval2[i]>=0.5) ||
                    (2*x_sigma[i]>maxBlock && eval2[i]>=0.5)) ieval1v.push_back(i);
             uvec ieval1=conv_to<uvec>::from(ieval1v);
             arma::mat evec1=evec2.cols(ieval1);

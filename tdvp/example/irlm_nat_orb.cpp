@@ -141,7 +141,7 @@ int main(int argc, char **argv)
 
     auto cc=Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites);
     cc.diag().print("ni");
-    rot = rot*Fermionic::rotNO3(cc,nExclude);
+    rot = rot*Fermionic::rotNO2(cc,nExclude);
     auto sys1b=model1.Ham(rot, nExclude==2);
     auto sol1b=computeGS(sys1b);
     cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites);
