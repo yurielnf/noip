@@ -12,7 +12,7 @@ using namespace std;
 int main(int argc, char **argv)
 {
     bool star=true;
-    int len=50;
+    int len=20;
     if (argc>=2) len=atoi(argv[1]);
     if (argc==3) star=atoi(argv[2]);
     IRLM model {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=-10};
@@ -57,10 +57,11 @@ int main(int argc, char **argv)
     out<<"0 "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real()<<endl;
     for(auto i=0u; i<len*10/2; i++) {
         sol.epsilonM=(i%10==0) ? 1e-4 : 0;
-        if (false && i%20==0) {
+        if (i%10==0) {
             auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
             cc.diag().raw_print("ni=");
-            arma::eig_sym(cc).raw_print("evals=");
+            string filename="eval_L"s+to_string(sol.hamsys.ham.length())+"_t"+to_string(i)+".txt";
+            arma::eig_sym(cc).save(filename,arma::raw_ascii);
         }
         sol.iterate();
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();

@@ -131,6 +131,12 @@ struct Fermionic {
         return cc;
     }
 
+    static arma::mat NOGates(arma::mat const& cc, int nExclude=2, double blockSize=8)
+    {
+        using namespace arma;
+//        itensor::BondGate()
+    }
+
     static arma::mat rotNO(arma::mat const& cc, int nExclude=2)
     {
         arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
@@ -244,7 +250,7 @@ struct Fermionic {
             for(auto i=0u; i<eval2.size(); i++)
                 if (eval2[i]<tolWannier ||
 //                if ((i>=nActive && eval2[i]<0.5) ||
-                   (diff1[i]>1.0 && eval2[i]<0.5) ||
+//                   (diff1[i]>1.0 && eval2[i]<0.5) ||
                    (2*x_sigma[i]>maxBlock && eval2[i]<0.5)) ieval0v.push_back(i);
             uvec ieval0=conv_to<uvec>::from(ieval0v);
             arma::mat evec0=evec2.cols(ieval0);
@@ -262,7 +268,7 @@ struct Fermionic {
             for(auto i=0u; i<eval2.size(); i++)
                 if (std::abs(1.0-eval2[i])<tolWannier ||
 //                if ((i>=nActive && eval2[i]>=0.5) ||
-                   (diff1[i]>1.0 && eval2[i]>=0.5) ||
+//                   (diff1[i]>1.0 && eval2[i]>=0.5) ||
                    (2*x_sigma[i]>maxBlock && eval2[i]>=0.5)) ieval1v.push_back(i);
             uvec ieval1=conv_to<uvec>::from(ieval1v);
             arma::mat evec1=evec2.cols(ieval1);
