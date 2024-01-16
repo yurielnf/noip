@@ -131,10 +131,27 @@ struct Fermionic {
         return cc;
     }
 
-    static arma::mat NOGates(arma::mat const& cc, int nExclude=2, double blockSize=8)
+    // return a matrix of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
+    static std::vector<itensor::BondGate> NOGates(arma::mat const& cc, int nExclude=2, double blockSize=8)
     {
         using namespace arma;
-//        itensor::BondGate()
+        arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
+        std::vector<itensor::BondGate> gates;
+        for(auto p=0u; p+blockSize<cc1.n_rows; p++) {
+            arma::mat cc2=cc.submat(p,p,p+blockSize-1,p+blockSize-1);
+            arma::mat evec;
+            arma::vec eval;
+            arma::eig_sym(eval,evec,cc2);
+            // select the less active
+            size_t pos=0;
+            if (1-eval.at(blockSize-1)<eval(0)) pos=blockSize-1;
+            const arma::vec& v=evec.col(pos);
+            for(auto i=0u; i+1<v.size(); i++)
+            {
+                // implement here the givens rotation for (a,b)
+            }
+
+        }
     }
 
     static arma::mat rotNO(arma::mat const& cc, int nExclude=2)
