@@ -131,10 +131,49 @@ struct Fermionic {
         return cc;
     }
 
+    // Givens rotation for reals. Taked from eigen.tuxfamily.org
+    template<typename Scalar>
+    static std::pair<double, double> makeGivens(const Scalar& p, const Scalar& q)
+    {
+        double m_c, m_s;
+        using std::sqrt;
+        using std::abs;
+        if(q==Scalar(0))
+        {
+            m_c = p<Scalar(0) ? Scalar(-1) : Scalar(1);
+            m_s = Scalar(0);
+        }
+        else if(p==Scalar(0))
+        {
+            m_c = Scalar(0);
+            m_s = q<Scalar(0) ? Scalar(1) : Scalar(-1);
+        }
+        else if(abs(p) > abs(q))
+        {
+            Scalar t = q/p;
+            Scalar u = sqrt(Scalar(1) + t*t);
+            if(p<Scalar(0))
+                u = -u;
+            m_c = Scalar(1)/u;
+            m_s = -t * m_c;
+        }
+        else
+        {
+            Scalar t = p/q;
+            Scalar u = sqrt(Scalar(1) + t*t);
+            if(q<Scalar(0))
+                u = -u;
+            m_s = -Scalar(1)/u;
+            m_c = -t * m_s;
+        }
+        return std::make_pair(m_c,m_s);
+    }
+
     // return a matrix of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
-    static std::vector<itensor::BondGate> NOGates(arma::mat const& cc, int nExclude=2, double blockSize=8)
+    static std::vector<itensor::BondGate> NOGates(itensor::Fermion const& sites, arma::mat const& cc, int nExclude=2, double blockSize=8)
     {
         using namespace arma;
+        using itensor::BondGate;
         arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
         std::vector<itensor::BondGate> gates;
         for(auto p=0u; p+blockSize<cc1.n_rows; p++) {
@@ -148,10 +187,16 @@ struct Fermionic {
             const arma::vec& v=evec.col(pos);
             for(auto i=0u; i+1<v.size(); i++)
             {
-                // implement here the givens rotation for (a,b)
+                auto [c,s]=makeGivens(v[i],v[i+1]);
+                auto angle=atan2(s,c);
+                auto b=i+nExclude+1;
+                auto hterm = 0.5*angle*( sites.op("Adag",b)*sites.op("A",b+1)
+                                        - sites.op("Adag",b+1)*sites.op("A",b));
+                auto g=BondGate(sites,b,b+1,BondGate::tReal,1,hterm);
+                gates.push_back(g);
             }
-
         }
+        return gates;
     }
 
     static arma::mat rotNO(arma::mat const& cc, int nExclude=2)
