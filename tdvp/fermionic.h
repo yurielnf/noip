@@ -40,6 +40,73 @@ auto eig_unitary(const arma::mat& A, int nExclude=2)
     return make_pair(lambda,rot);
 }
 
+struct GivensRot {
+    size_t b;     ///< bond b --- b+1
+    double c, s, r;  ///< cos and sin and radius
+
+    GivensRot(size_t b_) : b(b_) {}
+
+    /// to eliminate p from (p,q). Adapted from eigen.tuxfamily.org
+    GivensRot& make(double p, double q)
+    {
+        using Scalar=double;
+        using std::sqrt;
+        using std::abs;
+        std::swap(p,q); // to eliminate the p instead of q.
+        if(q==Scalar(0))
+        {
+            c = p<Scalar(0) ? Scalar(-1) : Scalar(1);
+            s = Scalar(0);
+            r = abs(p);
+        }
+        else if(p==Scalar(0))
+        {
+            c = Scalar(0);
+            s = q<Scalar(0) ? Scalar(1) : Scalar(-1);
+            r = abs(q);
+        }
+        else if(abs(p) > abs(q))
+        {
+            Scalar t = q/p;
+            Scalar u = sqrt(Scalar(1) + t*t);
+            if(p<Scalar(0))
+                u = -u;
+            c = Scalar(1)/u;
+            s = -t * c;
+            r = p * u;
+        }
+        else
+        {
+            Scalar t = p/q;
+            Scalar u = sqrt(Scalar(1) + t*t);
+            if(q<Scalar(0))
+                u = -u;
+            s = -Scalar(1)/u;
+            c = -t * s;
+            r = q * u;
+        }
+        return *this;
+    }
+
+    double angle() const { return atan2(s,c); }
+
+    arma::mat22 matrix() const { return {{c,-s},{s,c}}; }
+};
+
+arma::mat matrot_from_Givens(std::vector<GivensRot> const& gates)
+{
+    size_t n=0;
+    for(const GivensRot& g : gates) if (g.b>n) n=g.b;
+    n+=2;
+    arma::mat rot(n,n, arma::fill::eye);
+    for(int i=gates.size()-1; i>=0; i--) { // apply to the right in reverse
+        const GivensRot& g=gates[i];
+        rot.submat(g.b,g.b,g.b+1,g.b+1) = rot.submat(g.b,g.b,g.b+1,g.b+1) * g.matrix();
+    }
+    return rot;
+}
+
+
 
 struct HamSys {
     itensor::Fermion sites;
@@ -131,70 +198,46 @@ struct Fermionic {
         return cc;
     }
 
-    // Givens rotation for reals. Taked from eigen.tuxfamily.org
-    template<typename Scalar>
-    static std::pair<double, double> makeGivens(const Scalar& p, const Scalar& q)
-    {
-        double m_c, m_s;
-        using std::sqrt;
-        using std::abs;
-        if(q==Scalar(0))
-        {
-            m_c = p<Scalar(0) ? Scalar(-1) : Scalar(1);
-            m_s = Scalar(0);
-        }
-        else if(p==Scalar(0))
-        {
-            m_c = Scalar(0);
-            m_s = q<Scalar(0) ? Scalar(1) : Scalar(-1);
-        }
-        else if(abs(p) > abs(q))
-        {
-            Scalar t = q/p;
-            Scalar u = sqrt(Scalar(1) + t*t);
-            if(p<Scalar(0))
-                u = -u;
-            m_c = Scalar(1)/u;
-            m_s = -t * m_c;
-        }
-        else
-        {
-            Scalar t = p/q;
-            Scalar u = sqrt(Scalar(1) + t*t);
-            if(q<Scalar(0))
-                u = -u;
-            m_s = -Scalar(1)/u;
-            m_c = -t * m_s;
-        }
-        return std::make_pair(m_c,m_s);
-    }
-
-    // return a matrix of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
-    static std::vector<itensor::BondGate> NOGates(itensor::Fermion const& sites, arma::mat const& cc, int nExclude=2, double blockSize=8)
+    // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
+    static std::vector<GivensRot> NOGivensRot(arma::mat const& cc, int nExclude=2, size_t blockSize=8)
     {
         using namespace arma;
-        using itensor::BondGate;
         arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
-        std::vector<itensor::BondGate> gates;
-        for(auto p=0u; p+blockSize<cc1.n_rows; p++) {
-            arma::mat cc2=cc.submat(p,p,p+blockSize-1,p+blockSize-1);
-            arma::mat evec;
-            arma::vec eval;
+        std::vector<GivensRot> gates;
+        arma::mat evec;
+        arma::vec eval;
+        size_t d=blockSize;
+        for(auto p2=cc1.n_rows-1; p2>0u; p2--) {
+            size_t p1= (p2+1>d) ? p2+1-d : 0u ;
+            arma::mat cc2=cc.submat(p1,p1,p2,p2);
             arma::eig_sym(eval,evec,cc2);
             // select the less active
             size_t pos=0;
-            if (1-eval.at(blockSize-1)<eval(0)) pos=blockSize-1;
-            const arma::vec& v=evec.col(pos);
+            if (1-eval.back()<eval(0)) pos=eval.size()-1;
+            arma::vec v=evec.col(pos);
             for(auto i=0u; i+1<v.size(); i++)
             {
-                auto [c,s]=makeGivens(v[i],v[i+1]);
-                auto angle=atan2(s,c);
-                auto b=i+nExclude+1;
-                auto hterm = 0.5*angle*( sites.op("Adag",b)*sites.op("A",b+1)
-                                        - sites.op("Adag",b+1)*sites.op("A",b));
-                auto g=BondGate(sites,b,b+1,BondGate::tReal,1,hterm);
+                auto b=i+nExclude;
+                auto g=GivensRot(b).make(v[i],v[i+1]);
                 gates.push_back(g);
+                v[i+1]=g.r;
             }
+        }
+        return gates;
+    }
+
+    // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
+    static std::vector<itensor::BondGate> NOGates(itensor::Fermion const& sites, std::vector<GivensRot> const& gs)
+    {
+        using itensor::BondGate;
+        std::vector<itensor::BondGate> gates;
+        for(const GivensRot& g : gs)
+        {
+            int b=g.b+1;
+            auto hterm = ( sites.op("Adag",b)*sites.op("A",b+1)
+                          -sites.op("Adag",b+1)*sites.op("A",b))* (0.5*g.angle());
+            auto bg=BondGate(sites,b,b+1,BondGate::tReal,1,hterm);
+            gates.push_back(bg);
         }
         return gates;
     }

@@ -126,7 +126,7 @@ auto computeGS(HamSys const& sys)
 /// ./irlm_star <len>
 int main(int argc, char **argv)
 {
-    int len=20, nExclude=2;
+    int len=10, nExclude=2;
     if (argc==2) len=atoi(argv[1]);
     cout<<"\n-------------------------- solve the gs of system ----------------\n";
 
@@ -182,10 +182,16 @@ int main(int argc, char **argv)
         //double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
         if (i>=0) {
-            auto rot1=Fermionic::rotNO3(cc,nExclude);
             out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
-            psi=rotateState3(psi, rot1, nExclude).psi;
-            psi.orthogonalize({"Cutoff",1e-9});
+            //auto rot1=Fermionic::rotNO3(cc,nExclude);
+//            psi=rotateState3(psi, rot1, nExclude).psi;
+            auto gs=Fermionic::NOGivensRot(cc,2,8);
+            auto rot1=matrot_from_Givens(gs);
+            (rot1.t() * cc * rot1).print("rot1.t()*cc*rot1");
+            auto gates=Fermionic::NOGates(sys2.sites,gs);
+            gateTEvol(gates,1,1,psi,{"Cutoff=",1e-8,"Silent=",true});
+
+            //psi.orthogonalize({"Cutoff",1e-9});
             rot = rot*rot1;
         }
         for(auto i=0; i<psi.length(); i++)
