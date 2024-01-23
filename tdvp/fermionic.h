@@ -90,7 +90,7 @@ struct GivensRot {
 
     double angle() const { return atan2(s,c); }
 
-    arma::mat22 matrix() const { return {{c,-s},{s,c}}; }
+    arma::mat22 matrix() const { return {{c,s},{-s,c}}; }
 };
 
 arma::mat matrot_from_Givens(std::vector<GivensRot> const& gates)
@@ -100,8 +100,9 @@ arma::mat matrot_from_Givens(std::vector<GivensRot> const& gates)
     n+=2;
     arma::mat rot(n,n, arma::fill::eye);
     for(int i=gates.size()-1; i>=0; i--) { // apply to the right in reverse
+//    for(auto i=0u; i<gates.size(); i++) {
         const GivensRot& g=gates[i];
-        rot.submat(g.b,g.b,g.b+1,g.b+1) = rot.submat(g.b,g.b,g.b+1,g.b+1) * g.matrix();
+        rot.submat(0,g.b,n-1,g.b+1) = rot.submat(0,g.b,n-1,g.b+1) * g.matrix();
     }
     return rot;
 }
@@ -203,27 +204,31 @@ struct Fermionic {
     {
         using namespace arma;
         arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
-        std::vector<GivensRot> gates;
+        std::vector<GivensRot> gs;
         arma::mat evec;
         arma::vec eval;
         size_t d=blockSize;
         for(auto p2=cc1.n_rows-1; p2>0u; p2--) {
             size_t p1= (p2+1>d) ? p2+1-d : 0u ;
-            arma::mat cc2=cc.submat(p1,p1,p2,p2);
+            arma::mat cc2=cc1.submat(p1,p1,p2,p2);
             arma::eig_sym(eval,evec,cc2);
             // select the less active
             size_t pos=0;
             if (1-eval.back()<eval(0)) pos=eval.size()-1;
             arma::vec v=evec.col(pos);
+            std::vector<GivensRot> gs1;
             for(auto i=0u; i+1<v.size(); i++)
             {
-                auto b=i+nExclude;
+                auto b=i+p1;
                 auto g=GivensRot(b).make(v[i],v[i+1]);
-                gates.push_back(g);
+                gs1.push_back(g);
                 v[i+1]=g.r;
             }
+            auto rot1=matrot_from_Givens(gs1);
+            cc1.submat(0,0,p2,p2)=rot1*cc1.submat(0,0,p2,p2)*rot1.t();
+            for(auto g : gs1) { g.b+=nExclude; gs.push_back(g); }
         }
-        return gates;
+        return gs;
     }
 
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
@@ -235,7 +240,7 @@ struct Fermionic {
         {
             int b=g.b+1;
             auto hterm = ( sites.op("Adag",b)*sites.op("A",b+1)
-                          -sites.op("Adag",b+1)*sites.op("A",b))* (0.5*g.angle());
+                          -sites.op("Adag",b+1)*sites.op("A",b))* (-0.5*g.angle());
             auto bg=BondGate(sites,b,b+1,BondGate::tReal,1,hterm);
             gates.push_back(bg);
         }

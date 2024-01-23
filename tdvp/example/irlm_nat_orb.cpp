@@ -123,9 +123,51 @@ auto computeGS(HamSys const& sys)
 }
 
 
+void TestGivens()
+{
+    { // 2d case
+        arma::vec v={0.5,1.5};
+        auto g=GivensRot(0).make(v[0],v[1]);
+        g.matrix().print("g");
+        (g.matrix()*v).print("g*v");
+    }
+    { // 3d case
+        vector<GivensRot> gs;
+        arma::vec v={0.5,1.5,-1}, vc=v;
+        for(auto i=0u; i+1<v.size(); i++)
+        {
+            auto b=i;
+            auto g=GivensRot(b).make(v[i],v[i+1]);
+            gs.push_back(g);
+            v[i+1]=g.r;
+        }
+        auto rot=matrot_from_Givens(gs);
+        (rot*vc).print("rot*v");
+    }
+    { // matrix case
+        vector<GivensRot> gs;
+        arma::mat A(3,3, arma::fill::randu), evec;
+        arma::vec eval;
+        A = A*A.t();
+        arma::eig_sym(eval,evec,A);
+        arma::vec v=evec.col(0), vc=v;
+        for(auto i=0u; i+1<v.size(); i++)
+        {
+            auto b=i;
+            auto g=GivensRot(b).make(v[i],v[i+1]);
+            gs.push_back(g);
+            v[i+1]=g.r;
+        }
+        auto rot=matrot_from_Givens(gs);
+        (rot*vc).print("rot*v");
+        (rot*A*rot.t()).print("rot.t()*A*rot");
+    }
+}
+
 /// ./irlm_star <len>
 int main(int argc, char **argv)
 {
+    TestGivens();
     int len=10, nExclude=2;
     if (argc==2) len=atoi(argv[1]);
     cout<<"\n-------------------------- solve the gs of system ----------------\n";
@@ -185,14 +227,15 @@ int main(int argc, char **argv)
             out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
             //auto rot1=Fermionic::rotNO3(cc,nExclude);
 //            psi=rotateState3(psi, rot1, nExclude).psi;
-            auto gs=Fermionic::NOGivensRot(cc,2,8);
-            auto rot1=matrot_from_Givens(gs);
-            (rot1.t() * cc * rot1).print("rot1.t()*cc*rot1");
-            auto gates=Fermionic::NOGates(sys2.sites,gs);
+            auto gs=Fermionic::NOGivensRot(cc,nExclude,8);
+            auto rot1=matrot_from_Givens(gs);            
+            (rot1 * cc * rot1.t()).print("rot1*cc*rot1.t()");
+            auto gates=Fermionic::NOGates(sol.hamsys.sites,gs);
             gateTEvol(gates,1,1,psi,{"Cutoff=",1e-8,"Silent=",true});
-
+            cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
+            cc.print("cc after rot");
             //psi.orthogonalize({"Cutoff",1e-9});
-            rot = rot*rot1;
+            rot = rot*rot1.t();
         }
         for(auto i=0; i<psi.length(); i++)
             cout<<itensor::leftLinkIndex(psi,i+1).dim()<<" ";
