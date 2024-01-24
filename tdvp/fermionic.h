@@ -182,7 +182,7 @@ struct Fermionic {
 
     HamSys Ham() const
     {
-        itensor::Fermion sites(length(), {"ConserveNf=",false});
+        itensor::Fermion sites(length(), {"ConserveNf=",true});
         itensor::AutoMPO h(sites);
         Kin(h);
         Interaction(h);
@@ -235,12 +235,13 @@ struct Fermionic {
     static std::vector<itensor::BondGate> NOGates(itensor::Fermion const& sites, std::vector<GivensRot> const& gs)
     {
         using itensor::BondGate;
+        using itensor::Cplx_i;
         std::vector<itensor::BondGate> gates;
         for(const GivensRot& g : gs)
         {
             int b=g.b+1;
             auto hterm = ( sites.op("Adag",b)*sites.op("A",b+1)
-                          -sites.op("Adag",b+1)*sites.op("A",b))* (-0.5*g.angle());
+                          -sites.op("Adag",b+1)*sites.op("A",b))* (g.angle()*Cplx_i);
             auto bg=BondGate(sites,b,b+1,BondGate::tReal,1,hterm);
             gates.push_back(bg);
         }

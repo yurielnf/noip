@@ -168,7 +168,7 @@ void TestGivens()
 int main(int argc, char **argv)
 {
     TestGivens();
-    int len=10, nExclude=2;
+    int len=50, nExclude=2;
     if (argc==2) len=atoi(argv[1]);
     cout<<"\n-------------------------- solve the gs of system ----------------\n";
 
@@ -229,11 +229,11 @@ int main(int argc, char **argv)
 //            psi=rotateState3(psi, rot1, nExclude).psi;
             auto gs=Fermionic::NOGivensRot(cc,nExclude,8);
             auto rot1=matrot_from_Givens(gs);            
-            (rot1 * cc * rot1.t()).print("rot1*cc*rot1.t()");
+            //(rot1 * cc * rot1.t()).print("rot1*cc*rot1.t()");
             auto gates=Fermionic::NOGates(sol.hamsys.sites,gs);
-            gateTEvol(gates,1,1,psi,{"Cutoff=",1e-8,"Silent=",true});
-            cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
-            cc.print("cc after rot");
+            gateTEvol(gates,1,1,psi,{"Cutoff=",1e-12,"Silent=",true});
+            //cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
+            //cc.print("cc after rot");
             //psi.orthogonalize({"Cutoff",1e-9});
             rot = rot*rot1.t();
         }
