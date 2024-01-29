@@ -207,20 +207,27 @@ int main(int argc, char **argv)
     auto psi=sol1b.psi;
     for(auto i=0; i<len*10/2; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
+        itensor::cpu_time t0;
         auto sys2=model2.Ham(rot, nExclude==2);
+        cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
+        t0.mark();
         it_tdvp sol {sys2, psi};
         sol.dt={0,0.1};
         sol.bond_dim=256;
-        sol.rho_cutoff=1e-14;
+        sol.rho_cutoff=1e-12;
         sol.silent=false;
-        sol.epsilonM=(i%10==0) ? 1e-4 : 0;
+        sol.epsilonM=(i%1==0) ? 1e-2 : 0;
 
         sol.iterate();
+        cout<<"tdvp time"<<t0.sincemark()<<endl;
+        t0.mark();
 
         psi=sol.psi;
         //psi.orthogonalize({"Cutoff",1e-9});
         cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
         cc.diag().print("ni");
+        cout<<"cc computation:"<<t0.sincemark()<<endl;
+        t0.mark();
         //double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
         if (i>=0) {
@@ -231,7 +238,9 @@ int main(int argc, char **argv)
             auto rot1=matrot_from_Givens(gs);            
             //(rot1 * cc * rot1.t()).print("rot1*cc*rot1.t()");
             auto gates=Fermionic::NOGates(sol.hamsys.sites,gs);
-            gateTEvol(gates,1,1,psi,{"Cutoff=",1e-12,"Silent=",true});
+            gateTEvol(gates,1,1,psi,{"Cutoff",1e-10,"Quiet",true, "DoNormalize",true});
+            cout<<"circuit:"<<t0.sincemark()<<endl;
+            t0.mark();
             //cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
             //cc.print("cc after rot");
             //psi.orthogonalize({"Cutoff",1e-9});

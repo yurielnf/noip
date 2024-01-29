@@ -38,9 +38,9 @@ struct it_tdvp {
         if (epsilonM != 0)
         {
             // Global subspace expansion
-            std::vector<double> epsilonK = {1E-4, 1E-4};
-            //std::vector<int> maxDimK={2*bond_dim,2*bond_dim};
-            addBasis(psi,hamsys.ham,epsilonK,
+//            std::vector<double> epsilonK(3,1E-8);
+            std::vector<int> maxDimK(3,0.5*itensor::maxLinkDim(psi));
+            addBasis(psi,hamsys.ham,maxDimK,
                      {"Cutoff",epsilonM,
                       "Method","DensityMatrix",
                       "KrylovOrd",3,
@@ -55,7 +55,7 @@ struct it_tdvp {
                        "DoNormalize", do_normalize,
                        "Quiet",true,
                        "Silent",silent,
-                       "NumCenter",2,
+                       "NumCenter",1,
                        "ErrGoal", err_goal});
 
         nsweep++;
