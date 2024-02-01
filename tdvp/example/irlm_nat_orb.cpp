@@ -214,9 +214,11 @@ int main(int argc, char **argv)
         it_tdvp sol {sys2, psi};
         sol.dt={0,0.1};
         sol.bond_dim=256;
-        sol.rho_cutoff=1e-12;
+        sol.rho_cutoff=1e-14;
         sol.silent=false;
-        sol.epsilonM=(i%1==0) ? 1e-2 : 0;
+        sol.epsilonM=(i%10==0) ? 1e-4 : 0;
+        sol.enrichByFit = (i%10!=0);
+
 
         sol.iterate();
         cout<<"tdvp time"<<t0.sincemark()<<endl;
@@ -230,8 +232,8 @@ int main(int argc, char **argv)
         t0.mark();
         //double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
-        if (i>=0) {
-            out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
+        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
+        if (i%10==9) {
             //auto rot1=Fermionic::rotNO3(cc,nExclude);
 //            psi=rotateState3(psi, rot1, nExclude).psi;
             auto gs=Fermionic::NOGivensRot(cc,nExclude,8);

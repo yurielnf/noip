@@ -14,6 +14,7 @@ struct it_tdvp {
     bool do_normalize=true;
     double err_goal=1e-7;
     bool silent=true;
+    bool enrichByFit=false;
 
     int nsweep=0;
     double energy=0;
@@ -42,7 +43,7 @@ struct it_tdvp {
             std::vector<int> maxDimK(3,0.5*itensor::maxLinkDim(psi));
             addBasis(psi,hamsys.ham,maxDimK,
                      {"Cutoff",epsilonM,
-                      "Method","DensityMatrix",
+                      "Method",enrichByFit ? "Fit" : "DensityMatrix",
                       "KrylovOrd",3,
                       "DoNormalize", do_normalize,
                       "Quiet",true,
