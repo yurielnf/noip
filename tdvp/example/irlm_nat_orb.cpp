@@ -227,7 +227,7 @@ int main(int argc, char **argv)
         psi=sol.psi;
         //psi.orthogonalize({"Cutoff",1e-9});
         cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
-        cc.diag().print("ni");
+        cc.diag().raw_print("ni");
         cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
         //double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
