@@ -92,5 +92,50 @@ struct IRLM {
 
 };
 
+struct IRLM_star_ip {
+    std::vector<int> impPos, bathPos;
+    arma::mat K, Umat;
+    arma::vec ek,vk;
+    itensor::Fermion sites;
+    itensor::AutoMPO hImp;
+
+    IRLM_star_ip(const IRLM& irlm)
+        : impPos  {irlm.impPos()}
+        , bathPos {irlm.bathPos()}
+        , ek (bathPos.size())
+        , vk (bathPos.size())
+        , sites(irlm.L, {"ConserveNf=",true})
+        , hImp (sites)
+    {
+        std::tie(K,Umat)=irlm.matrices();
+        for(auto i=0u; i<bathPos.size(); i++) {
+            ek[i]=K(bathPos[i],bathPos[i]);
+            vk[i]=K(impPos[1],bathPos[i]);
+        }
+
+        for(auto i:impPos)
+            for(auto j:impPos) {
+                if (std::abs(K(i,j))>1e-15)
+                    hImp += K(i,j),"Cdag", i+1,"C", j+1;
+                if (std::abs(Umat(i,j))>1e-15)
+                    hImp += Umat(i,j),"N", i+1,"N", j+1;
+            }
+    }
+
+
+    HamSys Ham(double t, double dt) const
+    {
+        using arma::cx_double;
+        auto h=hImp;
+        for(auto k=0u; k<bathPos.size(); k++) {
+            auto vkt=vk[k] * arma::sinc(ek[k]*dt/2) * exp(cx_double(0,ek[k]*t));
+            h += vkt,"Cdag",impPos[1]+1,"C",bathPos[k]+1;
+            h += std::conj(vkt),"Cdag",bathPos[k]+1,"C",impPos[1]+1;
+        }
+        return {sites, itensor::toMPO(h)};
+    }
+
+};
+
 
 #endif // IRLM_H
