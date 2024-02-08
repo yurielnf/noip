@@ -108,6 +108,8 @@ struct IRLM_star_ip {
         , hImp (sites)
     {
         std::tie(K,Umat)=irlm.matrices();
+        auto rot=irlm.rotStar();
+        K=rot.t()*K*rot;
         for(auto i=0u; i<bathPos.size(); i++) {
             ek[i]=K(bathPos[i],bathPos[i]);
             vk[i]=K(impPos[1],bathPos[i]);
@@ -128,7 +130,7 @@ struct IRLM_star_ip {
         using arma::cx_double;
         auto h=hImp;
         for(auto k=0u; k<bathPos.size(); k++) {
-            auto vkt=vk[k] * arma::sinc(ek[k]*dt/2) * exp(cx_double(0,ek[k]*t));
+            cx_double vkt=vk[k] * arma::sinc(ek[k]*dt/2) * std::exp(cx_double(0,ek[k]*t));
             h += vkt,"Cdag",impPos[1]+1,"C",bathPos[k]+1;
             h += std::conj(vkt),"Cdag",bathPos[k]+1,"C",impPos[1]+1;
         }

@@ -13,6 +13,7 @@ int main(int argc, char **argv)
 {
     int star=1;
     int len=20;
+    double dt=0.1;
     if (argc>=2) len=atoi(argv[1]);
     if (argc==3) star=atoi(argv[2]);
     IRLM model {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=-10, .impCenter= star>1};
@@ -43,6 +44,7 @@ int main(int argc, char **argv)
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
 
     IRLM model2 {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=0.0, .impCenter= star>1};
+    IRLM_star_ip model2_ip{model2};
 
     auto psi=sol_gs.psi;
     ofstream out("irlm_star"+to_string(star)+"_L"+to_string(len)+".txt");
@@ -51,7 +53,8 @@ int main(int argc, char **argv)
     out<<"0 "<< maxLinkDim(sys.ham)<<" "<<maxLinkDim(psi)<<" "<<sol_gs.energy<<" "<<n0<<endl;
     for(auto i=0; i<len*10/2; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
-        auto sys2= star ? model2.HamStar() : model2.Ham();
+        //auto sys2= star ? model2.HamStar() : model2.Ham();
+        auto sys2=model2_ip.Ham((i+0.5)*dt, dt);
         it_tdvp sol {sys2, psi};
         sol.bond_dim=512;
         sol.err_goal=1e-7;
