@@ -47,15 +47,16 @@ int main(int argc, char **argv)
     IRLM_star_ip model2_ip{model2};
 
     auto psi=sol_gs.psi;
-    ofstream out("irlm_star"+to_string(star)+"_L"+to_string(len)+".txt");
+    ofstream out("irlm_star_ip_L"+to_string(len)+".txt");
     out<<"time M m energy n0\n"<<setprecision(14);
     double n0=itensor::expectC(psi, sol_gs.hamsys.sites, "N",{model2.impPos()[0]+1}).at(0).real();
     out<<"0 "<< maxLinkDim(sys.ham)<<" "<<maxLinkDim(psi)<<" "<<sol_gs.energy<<" "<<n0<<endl;
-    for(auto i=0; i<len*10/2; i++) {
+    for(auto i=0; i*dt<len/2; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         //auto sys2= star ? model2.HamStar() : model2.Ham();
         auto sys2=model2_ip.Ham((i+0.5)*dt, dt);
         it_tdvp sol {sys2, psi};
+        sol.dt={0,dt};
         sol.bond_dim=512;
         sol.err_goal=1e-7;
         sol.epsilonM=1e-4;
@@ -67,7 +68,7 @@ int main(int argc, char **argv)
         sol.iterate();
         psi=sol.psi;
 
-        if (true && i%10==0) {
+        if (false && i%10==0) {
             auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
             cc.diag().raw_print("ni=");
             string filename="eval_L"s+to_string(sol.hamsys.ham.length())+"_t"+to_string(i)+".txt";

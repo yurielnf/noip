@@ -130,7 +130,7 @@ struct IRLM_star_ip {
         using arma::cx_double;
         auto h=hImp;
         for(auto k=0u; k<bathPos.size(); k++) {
-            cx_double vkt=vk[k] * arma::sinc(ek[k]*dt/2) * std::exp(cx_double(0,ek[k]*t));
+            cx_double vkt=vk[k] * arma::sinc(ek[k]*dt/2) * std::exp(cx_double(0,-ek[k]*t));
             h += vkt,"Cdag",impPos[1]+1,"C",bathPos[k]+1;
             h += std::conj(vkt),"Cdag",bathPos[k]+1,"C",impPos[1]+1;
         }
