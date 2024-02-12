@@ -54,11 +54,12 @@ int main(int argc, char **argv)
     sol.silent=true;
     ofstream out("irlm_star"+to_string(star)+"_L"+to_string(sol.hamsys.ham.length())+".txt");
     out<<"sweep bond-dim energy n0\n"<<setprecision(14);
-    out<<"0 "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real()<<endl;
+    double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{model.impPos()[0]+1}).at(0).real();
+    out<<"0 "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
     for(auto i=0; i<len*10/2; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         sol.epsilonM=(i%10==0) ? 1e-4 : 0;
-        if (true && i%10==0) {
+        if (false && i%10==0) {
             auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
             cc.diag().raw_print("ni=");
             string filename="eval_L"s+to_string(sol.hamsys.ham.length())+"_t"+to_string(i)+".txt";
@@ -66,10 +67,10 @@ int main(int argc, char **argv)
         }
         sol.iterate();
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{model.impPos()[0]+1}).at(0).real();
-        out<<(i+1)*abs(sol.dt)<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<" ";
+        cout<<(i+1)*abs(sol.dt)<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<" ";
         for(auto i=1; i<sol.psi.length(); i++)
-            out<<itensor::leftLinkIndex(sol.psi,i+1).dim()<<" ";
-        out<<endl;
+            cout<<itensor::leftLinkIndex(sol.psi,i+1).dim()<<" ";
+        cout<<endl;
     }
 
     return 0;
