@@ -41,7 +41,8 @@ struct it_tdvp {
             // Global subspace expansion
 //            std::vector<double> epsilonK(3,1E-8);
             std::vector<int> maxDimK(3,0.5*itensor::maxLinkDim(psi));
-            addBasis(psi,hamsys.ham,maxDimK,
+            const itensor::MPO& hE= hamsys.hamEnrich.length()==0 ? hamsys.ham : hamsys.hamEnrich;
+            addBasis(psi,hE,maxDimK,
                      {"Cutoff",epsilonM,
                       "Method",enrichByFit ? "Fit" : "DensityMatrix",
                       "KrylovOrd",3,

@@ -205,10 +205,11 @@ int main(int argc, char **argv)
     double n0=itensor::expectC(sol1b.psi, sol1b.hamsys.sites, "N",{1}).at(0).real();
     out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<endl;
     auto psi=sol1b.psi;
+    arma::uvec inactive;
     for(auto i=0; i<len*10/2; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         itensor::cpu_time t0;
-        auto sys2=model2.Ham(rot, nExclude==2);
+        auto sys2=model2.Ham(rot, nExclude==2, inactive);
         cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
         it_tdvp sol {sys2, psi};
@@ -216,7 +217,7 @@ int main(int argc, char **argv)
         sol.bond_dim=256;
         sol.rho_cutoff=1e-14;
         sol.silent=false;
-        sol.epsilonM=(i%10==0) ? 1e-4 : 0;
+        sol.epsilonM=(i%1==0) ? 1e-4 : 0;
         sol.enrichByFit = (i%10!=0);
 
 
@@ -228,12 +229,13 @@ int main(int argc, char **argv)
         //psi.orthogonalize({"Cutoff",1e-9});
         cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
         cc.diag().print("ni");
-        cout<<"cc computation:"<<t0.sincemark()<<endl;
+        inactive=arma::find(cc.diag()<1e-5 || cc.diag()>1-1e-5);
+        cout<<"active: "<<len-inactive.size()<<" cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
         //double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
         out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
-        if (i%10==9) {
+        if (true || i%10==9) {
             //auto rot1=Fermionic::rotNO3(cc,nExclude);
 //            psi=rotateState3(psi, rot1, nExclude).psi;
             auto gs=Fermionic::NOGivensRot(cc,nExclude,8);
@@ -245,7 +247,7 @@ int main(int argc, char **argv)
             t0.mark();
             //cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
             //cc.print("cc after rot");
-            //psi.orthogonalize({"Cutoff",1e-9});
+            psi.orthogonalize({"Cutoff",1e-9});
             rot = rot*rot1.t();
         }
         for(auto i=0; i<psi.length(); i++)

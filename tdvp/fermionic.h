@@ -112,6 +112,7 @@ arma::mat matrot_from_Givens(std::vector<GivensRot> const& gates)
 struct HamSys {
     itensor::Fermion sites;
     itensor::MPO ham;
+    itensor::MPO hamEnrich;
 };
 
 struct HamSysExact {
@@ -123,10 +124,11 @@ struct Fermionic {
     arma::mat Kmat, Umat;
     std::map<std::array<int,4>, double> Vijkl;
     arma::mat Rot;
+    itensor::Fermion sites;
 
 
     explicit Fermionic(arma::mat const& Kmat_, arma::mat const& Umat_={}, std::map<std::array<int,4>, double> const& Vijkl_={})
-        : Kmat(Kmat_), Umat(Umat_), Vijkl(Vijkl_)
+        : Kmat(Kmat_), Umat(Umat_), Vijkl(Vijkl_), sites(Kmat_.n_rows, {"ConserveNf=",true})
     {}
 
     Fermionic(arma::mat const& Kmat_, arma::mat const& Umat_,
@@ -182,7 +184,6 @@ struct Fermionic {
 
     HamSys Ham() const
     {
-        itensor::Fermion sites(length(), {"ConserveNf=",true});
         itensor::AutoMPO h(sites);
         Kin(h);
         Interaction(h);
@@ -491,7 +492,7 @@ struct Fermionic {
 
         if (norm(kin)>0.1) kin.print("kin");
         auto L=rot.n_cols;
-        itensor::Fermion sites(L, {"ConserveNf=",false});
+        itensor::Fermion sites(L, {"ConserveNf=",true});
         itensor::AutoMPO h(sites);
         for(int i=0;i<L; i++)
             for(int j=0;j<L; j++)
