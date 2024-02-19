@@ -214,7 +214,7 @@ int main(int argc, char **argv)
         t0.mark();
         it_tdvp sol {sys2, psi};
         sol.dt={0,0.1};
-        sol.bond_dim=256;
+        sol.bond_dim=512;
         sol.rho_cutoff=1e-14;
         sol.silent=false;
         sol.epsilonM=(i%1==0) ? 1e-4 : 0;
@@ -233,8 +233,6 @@ int main(int argc, char **argv)
         cout<<"active: "<<len-inactive.size()<<" cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
         //double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
-        double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
-        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
         if (true || i%10==9) {
             //auto rot1=Fermionic::rotNO3(cc,nExclude);
 //            psi=rotateState3(psi, rot1, nExclude).psi;
@@ -250,6 +248,14 @@ int main(int argc, char **argv)
             psi.orthogonalize({"Cutoff",1e-9});
             rot = rot*rot1.t();
         }
+        double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
+        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
+
+        if (i%10==0) {
+            cc.save("cc_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
+            rot.save("orb_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
+        }
+
         for(auto i=0; i<psi.length(); i++)
             cout<<itensor::leftLinkIndex(psi,i+1).dim()<<" ";
         cout<<endl;
