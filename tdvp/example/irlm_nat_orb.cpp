@@ -75,7 +75,7 @@ State rotateState3(itensor::MPS psi, arma::mat const& rot, int nExclude=2)
 //    auto im=std::complex(0.,1.);
 //    arma::cx_mat(evec*diagmat(arma::log(eval)*im)*evec.t()).clean(1e-5).print("rotHam");
 
-    itensor::Fermion sites(psi.length(), {"ConserveNf=",false});
+    itensor::Fermion sites(psi.length(), {"ConserveNf=",true});
     psi.replaceSiteInds(sites.inds());
     cout<<"it m(psi2) m(psi)\n";
     for(auto a=psi.length()-1; a>=nExclude; a--) {
@@ -248,6 +248,17 @@ int main(int argc, char **argv)
             psi.orthogonalize({"Cutoff",1e-9});
             rot = rot*rot1.t();
         }
+
+        if (i%100==0) {// try Wannier of acitve orbitals:
+            auto rot1=Fermionic::rotNO4(cc,nExclude);
+            auto psi2=rotateState3(psi, rot1, nExclude).psi;
+            psi2.orthogonalize({"Cutoff",1e-9});
+            cout<<"Wannier of active orbitals:\n";
+            for(auto i=0; i<psi2.length(); i++)
+                cout<<itensor::leftLinkIndex(psi2,i+1).dim()<<" ";
+            cout<<endl;
+        }
+
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
         out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
 
