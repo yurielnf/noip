@@ -445,76 +445,47 @@ struct Fermionic {
         return rot;
     }
 
-    static arma::mat rotNO4(arma::mat const& cc, int nExclude=2, double tolWannier=1e-5)
+    static arma::mat rotNO4(arma::mat const& orb, arma::mat const& cc, int nExclude=2, double tolWannier=1e-5)
     {
         using namespace arma;
         arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
-        arma::mat J=arma::diagmat(arma::regspace(0,cc1.n_rows-1));
-        arma::mat evec;
-        arma::vec eval;
-        arma::eig_sym(eval,evec,cc1);  // +1e-5/cc1.n_rows*J
-        arma::vec activity(eval.size());
-        for(auto i=0u; i<eval.size(); i++)
-            activity[i]=-std::min(eval[i], -eval[i]+1);    //activity sorting
-        arma::uvec iev=arma::stable_sort_index(activity.clean(1e-14));
-        eval(iev).print("evals");
+        arma::mat orb1=orb.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
+        arma::mat J=orb1.t() * arma::diagmat(arma::regspace(0,cc1.n_rows-1)) * orb1;
 
-        arma::vec eval2=eval(iev);
-        arma::mat evec2=evec.cols(iev);
-
-        // fix the sign
-        for(auto j=0u; j<evec2.n_cols; j++) {
-            auto i=arma::index_max(arma::abs(evec2.col(j)));
-            evec2.col(j) /= arma::sign(evec2(i,j));
-        }
 
         // Wannier after activity sorting
-        arma::uvec weval;
+        arma::uvec active;
         arma::vec Xeval;
         arma::mat Xevec;
 
         {// group active natural orbitals
-            std::vector<size_t> ieval0v;
-            for(auto i=0u; i<eval2.size(); i++)
-                if (eval2[i]>tolWannier && eval2[i]<1-tolWannier) ieval0v.push_back(i);
-            uvec ieval0=conv_to<uvec>::from(ieval0v);
-            arma::mat evec0=evec2.cols(ieval0);
-            arma::mat X=evec0.t()* J * evec0;  // TODO: use real space position, not this.
-            arma::vec Xeval0;
-            arma::mat Xevec0;
-            arma::eig_sym(Xeval0,Xevec0,X);
-
-            weval=ieval0;
-            Xeval=Xeval0;
-            Xevec=Xevec0;
+            active=arma::find(cc1.diag()>tolWannier && cc1.diag()<1-tolWannier);
+            arma::mat X=J(active,active);
+            arma::eig_sym(Xeval,Xevec,X);
         }
 
         // apply Wannierization
-        arma::vec eval3=eval2;
-        arma::mat evec3=evec2;
-        evec3.cols(weval) = evec2.cols(weval) * Xevec;
 
-        // sort Wanier orbitals according to position
+        // sort Wannier orbitals according to position
         arma::uvec Xiev(Xeval.size());
         {
             Xiev=arma::stable_sort_index(Xeval);
 //            for(auto i=0u; i<Xeval.size(); i++) Xiev[i]=i;
         }
 
-        arma::vec eval4=eval3;
-        arma::mat evec4=evec3;
-        eval4(arma::sort(weval))=eval3(weval(Xiev));
-        evec4.cols(arma::sort(weval)) = evec3.cols(weval(Xiev));
+        arma::mat evec4=Xevec;
+        evec4.cols(arma::sort(active)) = Xevec.cols(active(Xiev));
 
         arma::mat rot(cc.n_rows,cc.n_cols,arma::fill::eye);
-        rot.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1)=evec4;
+        rot.submat(nExclude,nExclude,arma::size(evec4))=evec4;
 
 //        eval4.print("eval cicj");
 //        Xeval(Xiev).print("orbitals position");
 
         {
-            vec xi=(arma::mat {evec4.t()*J*evec4}).diag();
-            vec xi2=(arma::mat {evec4.t()*(J-diagmat(xi)) * (J-diagmat(xi))*evec4}).diag();
+            mat J1=J(active,active);
+            vec xi=(arma::mat {evec4.t()*J1*evec4}).diag();
+            vec xi2=(arma::mat {evec4.t()*(J1-diagmat(xi)) * (J1-diagmat(xi))*evec4}).diag();
             vec x_sigma=arma::sqrt(xi2.clean(1e-15));
             arma::join_horiz(xi,x_sigma).print("<X> sigmaX");
         }

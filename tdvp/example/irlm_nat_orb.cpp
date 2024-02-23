@@ -249,8 +249,8 @@ int main(int argc, char **argv)
             rot = rot*rot1.t();
         }
 
-        if (i%100==0) {// try Wannier of acitve orbitals:
-            auto rot1=Fermionic::rotNO4(cc,nExclude);
+        if (i%10==0) {// try Wannier of acitve orbitals:
+            auto rot1=Fermionic::rotNO4(rot,cc,nExclude);
             auto psi2=rotateState3(psi, rot1, nExclude).psi;
             psi2.orthogonalize({"Cutoff",1e-9});
             cout<<"Wannier of active orbitals:\n";
