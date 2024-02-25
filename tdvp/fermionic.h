@@ -473,8 +473,7 @@ struct Fermionic {
 //            for(auto i=0u; i<Xeval.size(); i++) Xiev[i]=i;
         }
 
-        arma::mat evec4=Xevec;
-        evec4.cols(arma::sort(active)) = Xevec.cols(active(Xiev));
+        arma::mat evec4=Xevec.cols(Xiev);
 
         arma::mat rot(cc.n_rows,cc.n_cols,arma::fill::eye);
         rot.submat(nExclude,nExclude,arma::size(evec4))=evec4;
@@ -483,9 +482,9 @@ struct Fermionic {
 //        Xeval(Xiev).print("orbitals position");
 
         {
-            mat J1=J(active,active);
-            vec xi=(arma::mat {evec4.t()*J1*evec4}).diag();
-            vec xi2=(arma::mat {evec4.t()*(J1-diagmat(xi)) * (J1-diagmat(xi))*evec4}).diag();
+            mat X=J(active,active);
+            vec xi=(arma::mat {evec4.t()*X*evec4}).diag();
+            vec xi2=(arma::mat {evec4.t()*(X-diagmat(xi)) * (X-diagmat(xi))*evec4}).diag();
             vec x_sigma=arma::sqrt(xi2.clean(1e-15));
             arma::join_horiz(xi,x_sigma).print("<X> sigmaX");
         }
