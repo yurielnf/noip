@@ -123,6 +123,43 @@ auto computeGS(HamSys const& sys)
 }
 
 
+static arma::mat TestrotNO4(arma::mat const& orb, arma::mat const& cc, int nExclude=2, double tolWannier=1e-5)
+{
+    using namespace arma;
+    arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
+    arma::mat orb1=orb.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
+    arma::mat J=orb1.t() * arma::diagmat(arma::regspace(0,cc1.n_rows-1)) * orb1;
+
+
+    // Wannier after activity sorting
+    arma::uvec active;
+    arma::vec Xeval;
+    arma::mat Xevec;
+
+    {// group active natural orbitals
+        active=arma::find(cc1.diag()>tolWannier && cc1.diag()<1-tolWannier);
+        arma::mat X=J;//(active,active);
+        arma::eig_sym(Xeval,Xevec,X);
+    }
+
+    // apply Wannierization
+
+    // sort Wannier orbitals according to position
+    arma::uvec Xiev(Xeval.size());
+    {
+        Xiev=arma::stable_sort_index(Xeval);
+//            for(auto i=0u; i<Xeval.size(); i++) Xiev[i]=i;
+    }
+
+    arma::mat evec4=Xevec.cols(Xiev);
+
+    arma::mat rot(cc.n_rows,cc.n_cols,arma::fill::eye);
+    rot.submat(nExclude,nExclude,arma::size(evec4))=evec4;
+
+    Xeval.print("xeval");
+    return rot;
+}
+
 void TestGivens()
 {
     { // 2d case
@@ -250,6 +287,7 @@ int main(int argc, char **argv)
         }
 
         if (i%10==0) {// try Wannier of acitve orbitals:
+            TestrotNO4(rot,cc,nExclude);
             auto rot1=Fermionic::rotNO4(rot,cc,nExclude);
             auto psi2=rotateState3(psi, rot1, nExclude).psi;
             psi2.orthogonalize({"Cutoff",1e-9});
