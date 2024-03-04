@@ -207,13 +207,14 @@ int main(int argc, char **argv)
     TestGivens();
     int len=50, nExclude=2;
     if (argc==2) len=atoi(argv[1]);
-    cout<<"\n-------------------------- solve the gs of system ----------------\n";
+    cout<<"\n-------------------------- solve the gs of system ----------------\n" << setprecision(12);
 
     auto model1=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=-10};
-    auto rot=model1.rotStar();
+    auto model2=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=0.0};
+    auto rot=model2.rotStar();
     //eig_unitary(rot);
     //return 0;
-    auto sol1a=computeGS(model1.Ham(rot, true));
+    auto sol1a=computeGS(model2.Ham(rot, true));
 
 
     cout<<"\n-------------------------- rotate the H to natural orbitals: find the gs again ----------------\n";
@@ -223,8 +224,9 @@ int main(int argc, char **argv)
     rot = rot*Fermionic::rotNO3(cc,nExclude);
     auto sys1b=model1.Ham(rot, nExclude==2);
     auto sol1b=computeGS(sys1b);
-    cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites);
-    cc.diag().print("ni");
+    //cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites);
+    //cc.diag().raw_print("ni");
+    int nExcludeGs=6;  // number of active orbitals in the gs of model2
 
 
     auto psi1=sol1b.psi;
@@ -235,10 +237,8 @@ int main(int argc, char **argv)
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
 
-    auto model2=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=0.0};
-
     ofstream out("irlm_no_L"s+to_string(len)+".txt");
-    out<<"time M m energy n0\n" << setprecision(12);
+    out<<"time M m energy n0\n";
     double n0=itensor::expectC(sol1b.psi, sol1b.hamsys.sites, "N",{1}).at(0).real();
     out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<endl;
     auto psi=sol1b.psi;
@@ -273,7 +273,7 @@ int main(int argc, char **argv)
         if (true || i%10==9) {
             //auto rot1=Fermionic::rotNO3(cc,nExclude);
 //            psi=rotateState3(psi, rot1, nExclude).psi;
-            auto gs=Fermionic::NOGivensRot(cc,nExclude,8);
+            auto gs=Fermionic::NOGivensRot(cc,nExcludeGs,8);
             auto rot1=matrot_from_Givens(gs);            
             //(rot1 * cc * rot1.t()).print("rot1*cc*rot1.t()");
             auto gates=Fermionic::NOGates(sol.hamsys.sites,gs);
@@ -286,7 +286,7 @@ int main(int argc, char **argv)
             rot = rot*rot1.t();
         }
 
-        if (i%10==0) {// try Wannier of acitve orbitals:
+        if (false && i%10==0) {// try Wannier of acitve orbitals:
             TestrotNO4(rot,cc,nExclude);
             auto rot1=Fermionic::rotNO4(rot,cc,nExclude);
             auto psi2=rotateState3(psi, rot1, nExclude).psi;
@@ -300,7 +300,7 @@ int main(int argc, char **argv)
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
         out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
 
-        if (i%10==0) {
+        if (false && i%10==0) {
             cc.save("cc_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
             rot.save("orb_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
         }
