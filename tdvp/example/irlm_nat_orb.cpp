@@ -254,7 +254,7 @@ int main(int argc, char **argv)
     auto sol1b=computeGS(sys1b);
     //cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites);
     //cc.diag().raw_print("ni");
-    int nExcludeGs=6;  // number of active orbitals in the gs of model2
+    int nExcludeGs=2;  // number of active orbitals in the gs of model2
 
 
     auto psi1=sol1b.psi;
