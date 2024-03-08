@@ -201,6 +201,34 @@ void TestGivens()
     }
 }
 
+
+double BondEntropy(itensor::MPS psi, itensor::Fermion const& sites, int b, double angle)
+{
+    using namespace itensor;
+    b=b+1;  // itensor convention
+    auto hterm = ( sites.op("Adag",b)*sites.op("A",b+1)
+                   -sites.op("Adag",b+1)*sites.op("A",b))* (angle*Cplx_i);
+    auto gate=BondGate(sites,b,b+1,BondGate::tReal,1,hterm);
+
+    psi.position(b);
+
+    auto AA = psi(gate.i1())*psi(gate.i2())*gate.gate();
+    AA.noPrime();
+    auto [U,S,V] = svd(AA,inds(psi(gate.i1())),{"Cutoff=",1E-8});
+    auto u = commonIndex(U,S);
+
+    //Apply von Neumann formula
+    //to the squares of the singular values
+    Real SvN = 0.;
+    for(auto n : range1(dim(u)))
+    {
+        auto Sn = elt(S,n,n);
+        auto p = sqr(Sn);
+        if(p > 1E-12) SvN += -p*log(p);
+    }
+    return SvN;
+}
+
 /// ./irlm_star <len>
 int main(int argc, char **argv)
 {
@@ -295,6 +323,18 @@ int main(int argc, char **argv)
             for(auto i=0; i<psi2.length(); i++)
                 cout<<itensor::leftLinkIndex(psi2,i+1).dim()<<" ";
             cout<<endl;
+        }
+
+        if (i%10==0) {// plot the entropy vs angle
+            for(auto b=0; b<9; b++) {
+                ofstream out("entropy_L"s+to_string(len)+"_t"+to_string(i)+"_b"+to_string(b)+".txt" );
+                int nangle=20;
+                double dx=2*M_PI/nangle;
+                for(auto i=0; i<nangle; i++) {
+                    auto angle=-M_PI+dx*i;
+                    out<<angle<<" "<<BondEntropy(psi,sol.hamsys.sites,b,angle)<<endl;
+                }
+            }
         }
 
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
