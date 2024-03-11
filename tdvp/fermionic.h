@@ -439,8 +439,8 @@ struct Fermionic {
         }
 
         std::cout<<"norm(1-rot)="<<arma::norm(rot-arma::mat(rot.n_rows, rot.n_cols, fill::eye))<< std::endl;
-        if ( arma::norm(rot-arma::mat(rot.n_rows, rot.n_cols, fill::eye))>0.1 )
-                       rot.print("rotation");
+//        if ( arma::norm(rot-arma::mat(rot.n_rows, rot.n_cols, fill::eye))>0.1 )
+//                       rot.print("rotation");
 
         return rot;
     }

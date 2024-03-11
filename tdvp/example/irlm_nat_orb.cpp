@@ -202,15 +202,20 @@ void TestGivens()
 }
 
 
-double BondEntropy(itensor::MPS psi, itensor::Fermion const& sites, int b, double angle)
+itensor::BondGate BondGateFromAngle(itensor::Fermion const& sites, int b, double angle)
 {
     using namespace itensor;
     b=b+1;  // itensor convention
     auto hterm = ( sites.op("Adag",b)*sites.op("A",b+1)
                    -sites.op("Adag",b+1)*sites.op("A",b))* (angle*Cplx_i);
-    auto gate=BondGate(sites,b,b+1,BondGate::tReal,1,hterm);
+    return BondGate(sites,b,b+1,BondGate::tReal,1,hterm);
+}
 
-    psi.position(b);
+double BondEntropy(itensor::MPS psi, itensor::Fermion const& sites, int b, double angle)
+{
+    using namespace itensor;
+    auto gate=BondGateFromAngle(sites,b,angle);
+    psi.position(b+1); // itensor convention b+1
 
     auto AA = psi(gate.i1())*psi(gate.i2())*gate.gate();
     AA.noPrime();
@@ -223,11 +228,31 @@ double BondEntropy(itensor::MPS psi, itensor::Fermion const& sites, int b, doubl
     for(auto n : range1(dim(u)))
     {
         auto Sn = elt(S,n,n);
-        auto p = sqr(Sn);
-        if(p > 1E-12) SvN += -p*log(p);
+        auto p=sqr(Sn);
+        if(Sn > 1E-12) SvN += -p*log(p);
     }
     return SvN;
 }
+
+
+arma::mat optimizeEntropyPair(itensor::MPS &psi, itensor::Fermion const& sites, int b, int nangle=20)
+{
+    double dx=M_PI/nangle;
+    vector<double> s(nangle);
+    for(auto i=0; i<nangle; i++) s[i]=BondEntropy(psi,sites,b,-M_PI/2+dx*i);
+    auto pos=std::min_element(s.begin(),s.end())-s.begin();
+
+    if (s[nangle/2]-s[pos]>1e-7) return {};
+    auto angle=-M_PI/2+dx*pos;
+    cout<<"\noptimization at bond "<<b<<" angle="<<angle<<" s[0]="<<s[nangle/2]<<" s[angle]=="<<s[pos]<<endl;
+    auto gate=BondGateFromAngle(sites,b,angle);
+    gateTEvol(vector{gate},1,1,psi,{"Cutoff",1e-10,"Quiet",true, "DoNormalize",true});
+    //rotate the H    <-------!!!
+    arma::mat rot1(psi.length(), psi.length(), arma::fill::eye);
+    rot1.submat(b,b,b+1,b+1)={{cos(angle),sin(angle)},{-sin(angle),cos(angle)}};
+    return rot1;
+}
+
 
 /// ./irlm_star <len>
 int main(int argc, char **argv)
@@ -325,20 +350,19 @@ int main(int argc, char **argv)
             cout<<endl;
         }
 
-        if (i%10==0) {// plot the entropy vs angle
-            for(auto b=0; b<9; b++) {
-                ofstream out("entropy_L"s+to_string(len)+"_t"+to_string(i)+"_b"+to_string(b)+".txt" );
-                int nangle=20;
-                double dx=2*M_PI/nangle;
-                for(auto i=0; i<nangle; i++) {
-                    auto angle=-M_PI+dx*i;
-                    out<<angle<<" "<<BondEntropy(psi,sol.hamsys.sites,b,angle)<<endl;
-                }
+        if (false && i%10==0) {// optimize the 2-site entropy
+            for(int b=len-inactive.size()-1; b>=nExclude; b--) {
+                auto rot1=optimizeEntropyPair(psi,sol.hamsys.sites,b);
+                rot=rot*rot1.t();
+            }
+            for(auto b=nExclude; b<len-inactive.size(); b++) {
+                auto rot1=optimizeEntropyPair(psi,sol.hamsys.sites,b);
+                rot=rot*rot1.t();
             }
         }
 
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
-        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
+        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(psi)<<" "<<sol.energy<<" "<<n0<<endl;
 
         if (false && i%10==0) {
             cc.save("cc_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
