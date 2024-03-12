@@ -6,6 +6,8 @@
 #include <iomanip>
 #include <fstream>
 
+#include<itensor/all.h>
+
 using namespace std;
 
 struct State {
@@ -211,7 +213,7 @@ itensor::BondGate BondGateFromAngle(itensor::Fermion const& sites, int b, double
     return BondGate(sites,b,b+1,BondGate::tReal,1,hterm);
 }
 
-double BondEntropy(itensor::MPS psi, itensor::Fermion const& sites, int b, double angle)
+double BondEntropy(itensor::MPS &psi, itensor::Fermion const& sites, int b, double angle)
 {
     using namespace itensor;
     auto gate=BondGateFromAngle(sites,b,angle);
@@ -219,7 +221,7 @@ double BondEntropy(itensor::MPS psi, itensor::Fermion const& sites, int b, doubl
 
     auto AA = psi(gate.i1())*psi(gate.i2())*gate.gate();
     AA.noPrime();
-    auto [U,S,V] = svd(AA,inds(psi(gate.i1())),{"Cutoff=",1E-8});
+    auto [U,S,V] = svd(AA,inds(psi(gate.i1())),{"Cutoff=",1E-8, "MaxDim", rightLinkIndex(psi,gate.i1()).size()});
     auto u = commonIndex(U,S);
 
     //Apply von Neumann formula
@@ -228,12 +230,26 @@ double BondEntropy(itensor::MPS psi, itensor::Fermion const& sites, int b, doubl
     for(auto n : range1(dim(u)))
     {
         auto Sn = elt(S,n,n);
-        auto p=sqr(Sn);
-        if(Sn > 1E-12) SvN += -p*log(p);
+//        auto p=sqr(Sn);
+//        if(Sn > 1E-12) SvN += -p*log(p);
+        if(Sn > 1E-12) SvN += Sn;
     }
     return SvN;
 }
 
+
+void exportPsi(itensor::MPS psi, string name="psi.txt")
+{
+    using namespace itensor;
+
+    ofstream out(name);
+    for(auto i:range1(psi.length())) {
+        ITensor M=psi.A(i);
+        auto Md=toDense(M);
+        print(out,Md);
+        out<<endl<<i<<"--------------->"<<endl;
+    }
+}
 
 arma::mat optimizeEntropyPair(itensor::MPS &psi, itensor::Fermion const& sites, int b, int nangle=20)
 {
@@ -242,7 +258,7 @@ arma::mat optimizeEntropyPair(itensor::MPS &psi, itensor::Fermion const& sites, 
     for(auto i=0; i<nangle; i++) s[i]=BondEntropy(psi,sites,b,-M_PI/2+dx*i);
     auto pos=std::min_element(s.begin(),s.end())-s.begin();
 
-    if (s[nangle/2]-s[pos]>1e-7) return {};
+    if (s[nangle/2]-s[pos]<1e-2) return {};
     auto angle=-M_PI/2+dx*pos;
     cout<<"\noptimization at bond "<<b<<" angle="<<angle<<" s[0]="<<s[nangle/2]<<" s[angle]=="<<s[pos]<<endl;
     auto gate=BondGateFromAngle(sites,b,angle);
@@ -288,10 +304,12 @@ int main(int argc, char **argv)
         cout<<itensor::leftLinkIndex(psi1,i+1).dim()<<" ";
     cout << "\n";
 
+    exportPsi(psi1); return 0;
+
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
 
     ofstream out("irlm_no_L"s+to_string(len)+".txt");
-    out<<"time M m energy n0\n";
+    out<<"time M m energy n0\n"<<setprecision(14);
     double n0=itensor::expectC(sol1b.psi, sol1b.hamsys.sites, "N",{1}).at(0).real();
     out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<endl;
     auto psi=sol1b.psi;
@@ -335,7 +353,6 @@ int main(int argc, char **argv)
             t0.mark();
             //cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
             //cc.print("cc after rot");
-            psi.orthogonalize({"Cutoff",1e-9});
             rot = rot*rot1.t();
         }
 
@@ -350,17 +367,24 @@ int main(int argc, char **argv)
             cout<<endl;
         }
 
-        if (false && i%10==0) {// optimize the 2-site entropy
-            for(int b=len-inactive.size()-1; b>=nExclude; b--) {
-                auto rot1=optimizeEntropyPair(psi,sol.hamsys.sites,b);
-                rot=rot*rot1.t();
-            }
-            for(auto b=nExclude; b<len-inactive.size(); b++) {
-                auto rot1=optimizeEntropyPair(psi,sol.hamsys.sites,b);
-                rot=rot*rot1.t();
+        if (true || i%10==9) {// optimize the 2-site entropy
+            bool found=true;
+            for(auto i=0;i<20 && found; i++) {
+                found=false;
+                for(int b=len-inactive.size()-1; b>=nExclude; b--) {
+                    auto rot1=optimizeEntropyPair(psi,sol.hamsys.sites,b);
+                    if (!rot1.empty()) { rot=rot*rot1.t(); found=true; }
+                }
+                if (!found) break;
+                found=false;
+                for(auto b=nExclude; b<len-inactive.size(); b++) {
+                    auto rot1=optimizeEntropyPair(psi,sol.hamsys.sites,b);
+                    if (!rot1.empty()) { rot=rot*rot1.t(); found=true; }
+                }
             }
         }
 
+        psi.orthogonalize({"Cutoff",1e-9});
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
         out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(psi)<<" "<<sol.energy<<" "<<n0<<endl;
 
