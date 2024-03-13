@@ -258,7 +258,7 @@ arma::mat optimizeEntropyPair(itensor::MPS &psi, itensor::Fermion const& sites, 
     for(auto i=0; i<nangle; i++) s[i]=BondEntropy(psi,sites,b,-M_PI/2+dx*i);
     auto pos=std::min_element(s.begin(),s.end())-s.begin();
 
-    if (s[nangle/2]-s[pos]<1e-2) return {};
+    if (s[nangle/2]-s[pos]<1e-5) return {};
     auto angle=-M_PI/2+dx*pos;
     cout<<"\noptimization at bond "<<b<<" angle="<<angle<<" s[0]="<<s[nangle/2]<<" s[angle]=="<<s[pos]<<endl;
     auto gate=BondGateFromAngle(sites,b,angle);
@@ -295,7 +295,7 @@ int main(int argc, char **argv)
     auto sol1b=computeGS(sys1b);
     //cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites);
     //cc.diag().raw_print("ni");
-    int nExcludeGs=2;  // number of active orbitals in the gs of model2
+    int nExcludeGs=12;  // number of active orbitals in the gs of model2
 
 
     auto psi1=sol1b.psi;
@@ -304,7 +304,7 @@ int main(int argc, char **argv)
         cout<<itensor::leftLinkIndex(psi1,i+1).dim()<<" ";
     cout << "\n";
 
-    exportPsi(psi1); return 0;
+//    exportPsi(psi1); return 0;
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
 
@@ -367,7 +367,7 @@ int main(int argc, char **argv)
             cout<<endl;
         }
 
-        if (true || i%10==9) {// optimize the 2-site entropy
+        if (false && i%10==9) {// optimize the 2-site entropy
             bool found=true;
             for(auto i=0;i<20 && found; i++) {
                 found=false;
