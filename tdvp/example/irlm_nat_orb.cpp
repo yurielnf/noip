@@ -109,7 +109,7 @@ auto computeGS(HamSys const& sys)
     sol_gs.bond_dim=64;
     sol_gs.noise=1e-5;
     cout<<"\nsweep bond-dim energy\n";
-    for(auto i=0u; i<4; i++) {
+    for(auto i=0u; i<10; i++) {
         if (i==3) {
             sol_gs.noise=1e-10;
 //            sol_gs.nIter_diag=2;
@@ -238,16 +238,36 @@ double BondEntropy(itensor::MPS &psi, itensor::Fermion const& sites, int b, doub
 }
 
 
-void exportPsi(itensor::MPS psi, string name="psi.txt")
+void exportPsi(itensor::MPS const& psi, string name="psi.txt")
 {
     using namespace itensor;
 
     ofstream out(name);
+    out<<setprecision(14);
+    out<<psi.length()<<endl;
+    for(auto i:range1(psi.length()-1))
+        out<<" "<<rightLinkIndex(psi,i).size();
+    out<<endl<<endl;
     for(auto i:range1(psi.length())) {
         ITensor M=psi.A(i);
-        auto Md=toDense(M);
-        print(out,Md);
-        out<<endl<<i<<"--------------->"<<endl;
+        auto li=leftLinkIndex(psi,i);
+        auto si=siteIndex(psi,i);
+        auto ri=rightLinkIndex(psi,i);
+
+        if (i==1)
+            for(auto b : range1(si))
+                for(auto c : range1(ri))
+                    print(out," ",eltC(M,si=b,ri=c));
+        else if (i==psi.length())
+            for(auto a : range1(li))
+                for(auto b : range1(si))
+                    print(out," ",eltC(M,li=a,si=b));
+        else
+            for(auto a : range1(li))
+                for(auto b : range1(si))
+                    for(auto c : range1(ri))
+                        print(out," ",eltC(M,li=a,si=b,ri=c));
+        out<<endl<<endl;
     }
 }
 
@@ -270,11 +290,12 @@ arma::mat optimizeEntropyPair(itensor::MPS &psi, itensor::Fermion const& sites, 
 }
 
 
-/// ./irlm_star <len>
+/// ./irlm_nat_orb <len>
 int main(int argc, char **argv)
 {
-    TestGivens();
-    int len=50, nExclude=2;
+//    TestGivens();
+    int len=20, nExclude=2;
+    double tolWannier=1e-9;
     if (argc==2) len=atoi(argv[1]);
     cout<<"\n-------------------------- solve the gs of system ----------------\n" << setprecision(12);
 
@@ -285,18 +306,19 @@ int main(int argc, char **argv)
     //return 0;
     auto sol1a=computeGS(model2.Ham(rot, true));
 
-
     cout<<"\n-------------------------- rotate the H to natural orbitals: find the gs again ----------------\n";
 
     auto cc=Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites);
     cc.diag().print("ni");
-    rot = rot*Fermionic::rotNO3(cc,nExclude);
+    rot = rot*Fermionic::rotNO3(cc,nExclude,tolWannier);
     auto sys1b=model1.Ham(rot, nExclude==2);
     auto sol1b=computeGS(sys1b);
     //cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites);
     //cc.diag().raw_print("ni");
-    int nExcludeGs=12;  // number of active orbitals in the gs of model2
-
+    arma::vec eval=arma::eig_sym(cc);
+    int nExcludeGs=arma::find(eval>tolWannier && eval<1-tolWannier).eval().size();  // number of active orbitals in the gs of model2
+    cout<<"\nNumber of active orbitals of the future gs: "<<nExcludeGs<<endl;
+    nExcludeGs=2;
 
     auto psi1=sol1b.psi;
     psi1.orthogonalize({"Cutoff",1e-9});
@@ -304,7 +326,10 @@ int main(int argc, char **argv)
         cout<<itensor::leftLinkIndex(psi1,i+1).dim()<<" ";
     cout << "\n";
 
-//    exportPsi(psi1); return 0;
+    // for Maxime
+    cc.save("cc_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
+    rot.save("orb_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
+    exportPsi(sol1b.psi,"psi_t"s+to_string(0)+".txt");
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
 
@@ -388,9 +413,10 @@ int main(int argc, char **argv)
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
         out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(psi)<<" "<<sol.energy<<" "<<n0<<endl;
 
-        if (false && i%10==0) {
+        if (true && i%100==0) {
             cc.save("cc_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
             rot.save("orb_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
+            exportPsi(psi,"psi_t"s+to_string(i)+".txt");
         }
 
         for(auto i=0; i<psi.length(); i++)
