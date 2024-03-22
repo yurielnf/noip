@@ -295,49 +295,63 @@ int main(int argc, char **argv)
 {
 //    TestGivens();
     int len=20, nExclude=2;
-    double tolWannier=1e-9;
     if (argc==2) len=atoi(argv[1]);
     cout<<"\n-------------------------- solve the gs of system ----------------\n" << setprecision(12);
 
     auto model1=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=-10};
     auto model2=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=0.0};
     auto rot=model2.rotStar();
-    //eig_unitary(rot);
-    //return 0;
-    auto sol1a=computeGS(model2.Ham(rot, true));
+    auto sol2a=computeGS(model2.Ham(rot, true));
+
+    auto cc=Fermionic::cc_matrix(sol2a.psi, sol2a.hamsys.sites);
+    cc.save("cc_L"s+to_string(len)+"_gs2a.txt",arma::raw_ascii);
+    rot.save("orb_L"s+to_string(len)+"_gs2a.txt",arma::raw_ascii);
+
 
     cout<<"\n-------------------------- rotate the H to natural orbitals: find the gs again ----------------\n";
 
-    auto cc=Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites);
-    cc.diag().print("ni");
+    double tolWannier=1e-9;
+    auto rot1=Fermionic::rotNO3(cc,nExclude,tolWannier);
+    rot = rot*rot1;
+    auto sys2b=model2.Ham(rot, nExclude==2);
+    auto sol2b=computeGS(sys2b);
+
+
+    (rot1.t()*cc*rot1).eval().save("cc_L"s+to_string(len)+"_gs2b.txt",arma::raw_ascii);
+    cc=Fermionic::cc_matrix(sol2b.psi, sol2b.hamsys.sites);
+    cc.save("cc_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
+    rot.save("orb_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
+    int nExcludeGs=arma::find(cc.diag()>tolWannier && cc.diag()<1-tolWannier).eval().size();  // number of active orbitals in the gs of model2
+    if (nExcludeGs>12) {
+        nExcludeGs=12;
+        arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
+        arma::vec eval=arma::eig_sym(cc1);
+        arma::vec activity(eval.size());
+        for(auto i=0u; i<eval.size(); i++)
+            activity[i]=-std::min(eval[i], -eval[i]+1);    //activity sorting
+        arma::uvec iev=arma::stable_sort_index(activity.clean(1e-15));
+        tolWannier=-activity(iev.at(nExcludeGs-nExclude));
+    }
+    cout<<"\nNumber of active orbitals of the future gs, tol: "<<nExcludeGs<<" "<<tolWannier<<endl;
+
+
+    cout<<"\n-------------------------- find the gs1 in NO2 ----------------\n";
+
     rot = rot*Fermionic::rotNO3(cc,nExclude,tolWannier);
-    auto sys1b=model1.Ham(rot, nExclude==2);
-    auto sol1b=computeGS(sys1b);
-    //cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites);
-    //cc.diag().raw_print("ni");
-    arma::vec eval=arma::eig_sym(cc);
-    int nExcludeGs=arma::find(eval>tolWannier && eval<1-tolWannier).eval().size();  // number of active orbitals in the gs of model2
-    cout<<"\nNumber of active orbitals of the future gs: "<<nExcludeGs<<endl;
-    nExcludeGs=2;
+    auto sys1=model1.Ham(rot, nExclude==2);
+    auto sol1=computeGS(sys1);
 
-    auto psi1=sol1b.psi;
-    psi1.orthogonalize({"Cutoff",1e-9});
-    for(auto i=0; i<psi1.length(); i++)
-        cout<<itensor::leftLinkIndex(psi1,i+1).dim()<<" ";
-    cout << "\n";
-
-    // for Maxime
     cc.save("cc_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
     rot.save("orb_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
-    exportPsi(sol1b.psi,"psi_t"s+to_string(0)+".txt");
+    //exportPsi(sol1b.psi,"psi_t"s+to_string(0)+".txt");
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
 
+    auto psi=sol1.psi;
     ofstream out("irlm_no_L"s+to_string(len)+".txt");
     out<<"time M m energy n0\n"<<setprecision(14);
-    double n0=itensor::expectC(sol1b.psi, sol1b.hamsys.sites, "N",{1}).at(0).real();
-    out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<endl;
-    auto psi=sol1b.psi;
+    double n0=itensor::expectC(sol1.psi, sol1.hamsys.sites, "N",{1}).at(0).real();
+    out<<"0 "<< maxLinkDim(sys1.ham) <<" "<<maxLinkDim(sol1.psi)<<" "<<sol1.energy<<" "<<n0<<endl;
     arma::uvec inactive;
     for(auto i=0; i<len*10/2; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
@@ -352,7 +366,6 @@ int main(int argc, char **argv)
         sol.silent=false;
         sol.epsilonM=(i%1==0) ? 1e-4 : 0;
         sol.enrichByFit = (i%10!=0);
-
 
         sol.iterate();
         cout<<"tdvp time"<<t0.sincemark()<<endl;
@@ -416,7 +429,7 @@ int main(int argc, char **argv)
         if (true && i%100==0) {
             cc.save("cc_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
             rot.save("orb_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
-            exportPsi(psi,"psi_t"s+to_string(i)+".txt");
+            //exportPsi(psi,"psi_t"s+to_string(i)+".txt");
         }
 
         for(auto i=0; i<psi.length(); i++)
