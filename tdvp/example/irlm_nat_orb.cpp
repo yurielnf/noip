@@ -330,7 +330,7 @@ int main(int argc, char **argv)
         for(auto i=0u; i<eval.size(); i++)
             activity[i]=-std::min(eval[i], -eval[i]+1);    //activity sorting
         arma::uvec iev=arma::stable_sort_index(activity.clean(1e-15));
-        tolWannier=-activity(iev.at(nExcludeGs-nExclude));
+        tolWannier=0.5*(-activity(iev.at(nExcludeGs-nExclude-1))-activity(iev.at(nExcludeGs-nExclude))); // in the middle
     }
     cout<<"\nNumber of active orbitals of the future gs, tol: "<<nExcludeGs<<" "<<tolWannier<<endl;
 
