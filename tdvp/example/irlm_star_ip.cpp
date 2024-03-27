@@ -11,7 +11,7 @@ using namespace std;
 /// ./irlm_star <len> [star]
 int main(int argc, char **argv)
 {
-    int star=1;
+    int star=2;
     int len=20;
     double dt=0.1;
     if (argc>=2) len=atoi(argv[1]);
@@ -26,7 +26,7 @@ int main(int argc, char **argv)
     sol_gs.bond_dim=128;
     sol_gs.noise=1e-3;
     cout<<"\nsweep bond-dim energy\n";
-    for(auto i=0; i<6; i++) {
+    for(auto i=0; i<10; i++) {
         if (i==3) {
             sol_gs.noise=1e-8;
             sol_gs.nIter_diag=32;
@@ -63,7 +63,7 @@ int main(int argc, char **argv)
         sol.do_normalize=true;
         sol.rho_cutoff=1e-14;
         sol.silent=true;
-        sol.epsilonM=(i%10==0) ? 1e-4 : 0;
+        sol.enrichByFit=(i%10!=0);
 
         sol.iterate();
         psi=sol.psi;

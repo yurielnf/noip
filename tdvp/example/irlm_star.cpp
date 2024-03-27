@@ -58,7 +58,7 @@ int main(int argc, char **argv)
     out<<"0 "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
     for(auto i=0; i<len*10/2; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
-        sol.epsilonM=(i%10==0) ? 1e-4 : 0;
+        sol.enrichByFit=(i%10!=0);
         if (false && i%10==0) {
             auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
             cc.diag().raw_print("ni=");
