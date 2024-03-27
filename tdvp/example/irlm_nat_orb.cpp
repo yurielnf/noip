@@ -310,7 +310,7 @@ int main(int argc, char **argv)
 
     cout<<"\n-------------------------- rotate the H to natural orbitals: find the gs again ----------------\n";
 
-    double tolWannier=1e-9;
+    double tolWannier=1e-7;
     auto rot1=Fermionic::rotNO3(cc,nExclude,tolWannier);
     rot = rot*rot1;
     auto sys2b=model2.Ham(rot, nExclude==2);
@@ -322,24 +322,30 @@ int main(int argc, char **argv)
     cc.save("cc_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
     rot.save("orb_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
     int nExcludeGs=arma::find(cc.diag()>tolWannier && cc.diag()<1-tolWannier).eval().size();  // number of active orbitals in the gs of model2
-    if (nExcludeGs>12) {
-        nExcludeGs=12;
+    {
+        if (nExcludeGs>12) nExcludeGs=12;
         arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
         arma::vec eval=arma::eig_sym(cc1);
         arma::vec activity(eval.size());
         for(auto i=0u; i<eval.size(); i++)
             activity[i]=-std::min(eval[i], -eval[i]+1);    //activity sorting
         arma::uvec iev=arma::stable_sort_index(activity.clean(1e-15));
-        tolWannier=0.5*(-activity(iev.at(nExcludeGs-nExclude-1))-activity(iev.at(nExcludeGs-nExclude))); // in the middle
+        tolWannier=sqrt(activity(iev.at(nExcludeGs-nExclude-1))*activity(iev.at(nExcludeGs-nExclude))); // in the middle (logscale)
     }
     cout<<"\nNumber of active orbitals of the future gs, tol: "<<nExcludeGs<<" "<<tolWannier<<endl;
+
 
 
     cout<<"\n-------------------------- find the gs1 in NO2 ----------------\n";
 
     rot = rot*Fermionic::rotNO3(cc,nExclude,tolWannier);
-    auto sys1=model1.Ham(rot, nExclude==2);
+    {
+        auto [K,Umat]=model2.matrices();
+        (rot.t()*K*rot).eval().clean(tolWannier).save("kin_L"s+to_string(len)+"_NOgs2.txt",arma::raw_ascii);
+    }
+    auto sys1=model1.Ham(rot, nExclude==2);    
     auto sol1=computeGS(sys1);
+
 
     cc.save("cc_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
     rot.save("orb_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
