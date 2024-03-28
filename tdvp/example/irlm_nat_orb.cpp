@@ -296,28 +296,31 @@ int main(int argc, char **argv)
 //    TestGivens();
     int len=20, nExclude=2;
     if (argc==2) len=atoi(argv[1]);
-    cout<<"\n-------------------------- solve the gs of system ----------------\n" << setprecision(12);
-
     auto model1=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=-10};
     auto model2=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=0.0};
+
+    cout<<"\n-------------------------- solve the gs2 ----------------\n" << setprecision(12);
+
     auto rot=model2.rotStar();
     auto sol2a=computeGS(model2.Ham(rot, true));
 
+    arma::mat xOp=arma::diagmat(arma::regspace(0,len-1));
     auto cc=Fermionic::cc_matrix(sol2a.psi, sol2a.hamsys.sites);
-    cc.save("cc_L"s+to_string(len)+"_gs2a.txt",arma::raw_ascii);
-    rot.save("orb_L"s+to_string(len)+"_gs2a.txt",arma::raw_ascii);
+    cc.save("cc_L"s+to_string(len)+"_gs2_star.txt",arma::raw_ascii);
+    rot.save("orb_L"s+to_string(len)+"_gs2_star.txt",arma::raw_ascii);
 
 
     cout<<"\n-------------------------- rotate the H to natural orbitals: find the gs again ----------------\n";
 
-    double tolWannier=1e-7;
-    auto rot1=Fermionic::rotNO3(cc,nExclude,tolWannier);
-    rot = rot*rot1;
+    double tolWannier=1e-5;
+    auto rot1=Fermionic::rotNO3(cc,xOp,nExclude,tolWannier);
+    (rot1.t()*cc*rot1).eval().save("cc_L"s+to_string(len)+"_gs2_star_noW.txt",arma::raw_ascii);
+
+    rot=rot*rot1;
+    xOp=rot1.t()*xOp*rot1;
     auto sys2b=model2.Ham(rot, nExclude==2);
     auto sol2b=computeGS(sys2b);
 
-
-    (rot1.t()*cc*rot1).eval().save("cc_L"s+to_string(len)+"_gs2b.txt",arma::raw_ascii);
     cc=Fermionic::cc_matrix(sol2b.psi, sol2b.hamsys.sites);
     cc.save("cc_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
     rot.save("orb_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
@@ -332,13 +335,15 @@ int main(int argc, char **argv)
         arma::uvec iev=arma::stable_sort_index(activity.clean(1e-15));
         tolWannier=sqrt(activity(iev.at(nExcludeGs-nExclude-1))*activity(iev.at(nExcludeGs-nExclude))); // in the middle (logscale)
     }
-    cout<<"\nNumber of active orbitals of the future gs, tol: "<<nExcludeGs<<" "<<tolWannier<<endl;
+    cout<<"\nNumber of active orbitals of the future gs, tol: "<<nExcludeGs<<", "<<tolWannier<<endl;
 
 
 
     cout<<"\n-------------------------- find the gs1 in NO2 ----------------\n";
 
-    rot = rot*Fermionic::rotNO3(cc,nExclude,tolWannier);
+    rot1=Fermionic::rotNO3(cc,xOp,nExclude,tolWannier);
+    rot = rot*rot1;
+    xOp=rot1.t()*xOp*rot1;
     {
         auto [K,Umat]=model2.matrices();
         (rot.t()*K*rot).eval().clean(tolWannier).save("kin_L"s+to_string(len)+"_NOgs2.txt",arma::raw_ascii);

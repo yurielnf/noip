@@ -315,12 +315,12 @@ struct Fermionic {
     }
 
 //    static arma::mat rotNO3(arma::mat const& cc, int nExclude=2, int nActive=8, double maxBlock=0)
-    static arma::mat rotNO3(arma::mat const& cc, int nExclude=2, double tolWannier=1e-5, double maxBlock=0)
+    static arma::mat rotNO3(arma::mat const& cc, arma::mat xOp, int nExclude=2,double tolWannier=1e-5, double maxBlock=0)
     {
         if (maxBlock==0) maxBlock=cc.n_rows;
         using namespace arma;
         arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
-        arma::mat J=arma::diagmat(arma::regspace(0,cc1.n_rows-1));
+        arma::mat J=xOp.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
         arma::mat evec;
         arma::vec eval;
         arma::eig_sym(eval,evec,cc1);  // +1e-5/cc1.n_rows*J
