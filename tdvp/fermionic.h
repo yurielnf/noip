@@ -91,6 +91,8 @@ struct GivensRot {
     double angle() const { return atan2(s,c); }
 
     arma::mat22 matrix() const { return {{c,s},{-s,c}}; }
+
+    void transposeInPlace() {s=-s;}
 };
 
 arma::mat matrot_from_Givens(std::vector<GivensRot> const& gates)
@@ -217,6 +219,50 @@ struct Fermionic {
             size_t pos=0;
             if (1-eval.back()<eval(0)) pos=eval.size()-1;
             arma::vec v=evec.col(pos);
+            std::vector<GivensRot> gs1;
+            for(auto i=0u; i+1<v.size(); i++)
+            {
+                auto b=i+p1;
+                auto g=GivensRot(b).make(v[i],v[i+1]);
+                gs1.push_back(g);
+                v[i+1]=g.r;
+            }
+            auto rot1=matrot_from_Givens(gs1);
+            cc1.submat(0,0,p2,p2)=rot1*cc1.submat(0,0,p2,p2)*rot1.t();
+            for(auto g : gs1) { g.b+=nExclude; gs.push_back(g); }
+        }
+        return gs;
+    }
+
+    static std::pair<int,int> bestMatching(std::vector<double> const& a, std::vector<double> const& b)
+    {
+        assert(a.size() && b.size());
+        auto best=std::numeric_limits<double>::max();
+        int i0,j0;
+        for(auto i=0u; i<a.size(); i++)
+            for(auto j=0; j<b.size(); j++)
+                if (auto d=std::abs(a[i]-b[j]); d<best) {best=d; i0=i; j0=j;}
+        return {i0,j0};
+    }
+
+    // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
+    static std::vector<GivensRot> GivensRotForMatrix(arma::mat const& cc, int nExclude=2, size_t blockSize=8)
+    {
+        using namespace arma;
+        arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
+        std::vector<GivensRot> gs;
+        arma::mat evec;
+        arma::vec eval;
+        auto evalRef=conv_to<std::vector<double>>::from( eig_sym(cc1) );
+        size_t d=blockSize;
+        for(auto p2=cc1.n_rows-1; p2>0u; p2--) {
+            size_t p1= (p2+1>d) ? p2+1-d : 0u ;
+            arma::mat cc2=cc1.submat(p1,p1,p2,p2);
+            arma::eig_sym(eval,evec,cc2);
+            // select the less active
+            auto [i0,j0]=bestMatching(conv_to<std::vector<double>>::from(eval), evalRef);
+            evalRef.erase(evalRef.begin()+j0);
+            arma::vec v=evec.col(i0);
             std::vector<GivensRot> gs1;
             for(auto i=0u; i+1<v.size(); i++)
             {

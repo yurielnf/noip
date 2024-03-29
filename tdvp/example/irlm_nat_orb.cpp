@@ -343,9 +343,11 @@ int main(int argc, char **argv)
 
     rot1=Fermionic::rotNO3(cc,xOp,nExclude,tolWannier);
     rot = rot*rot1;
+    arma::mat K;
     xOp=rot1.t()*xOp*rot1;
     {
-        auto [K,Umat]=model2.matrices();
+        arma::mat Umat;
+        std::tie(K,Umat)=model2.matrices();
         (rot.t()*K*rot).eval().clean(tolWannier).save("kin_L"s+to_string(len)+"_NOgs2.txt",arma::raw_ascii);
     }
     auto sys1=model1.Ham(rot, nExclude==2);    
@@ -384,25 +386,43 @@ int main(int argc, char **argv)
 
         psi=sol.psi;
         //psi.orthogonalize({"Cutoff",1e-9});
-        cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
-        cc.diag().print("ni");
-        inactive=arma::find(cc.diag()<1e-5 || cc.diag()>1-1e-5);
-        cout<<"active: "<<len-inactive.size()<<" cc computation:"<<t0.sincemark()<<endl;
+        cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);        
+        cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
         //double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
         if (true || i%10==9) {
             //auto rot1=Fermionic::rotNO3(cc,nExclude);
 //            psi=rotateState3(psi, rot1, nExclude).psi;
-            auto gs=Fermionic::NOGivensRot(cc,nExcludeGs,8);
-            auto rot1=matrot_from_Givens(gs);            
-            //(rot1 * cc * rot1.t()).print("rot1*cc*rot1.t()");
-            auto gates=Fermionic::NOGates(sol.hamsys.sites,gs);
+            auto givens=Fermionic::GivensRotForMatrix(cc,nExcludeGs,8);
+            auto rot1=matrot_from_Givens(givens);
+            //(rot1.t() * cc * rot1).print("rot1.t()*cc*rot1");
+            auto gates=Fermionic::NOGates(sol.hamsys.sites,givens);
             gateTEvol(gates,1,1,psi,{"Cutoff",1e-10,"Quiet",true, "DoNormalize",true});
             cout<<"circuit:"<<t0.sincemark()<<endl;
             t0.mark();
             //cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
             //cc.print("cc after rot");
             rot = rot*rot1.t();
+            cc=rot1*cc*rot1.t();
+        }
+
+        cc.diag().print("ni");
+
+        if (true || i%10==9) { // another circuit to diagonalize kin in the inactive sector
+            arma::mat kin=rot.t()*K*rot;
+            arma::uvec active=arma::find(cc.diag()>1e-8 && cc.diag()<1-1e-8);
+            cout<<"active after circuit1: "<<active.size()<<endl;
+            auto givens=Fermionic::GivensRotForMatrix(kin,active.size(),8);
+            auto rot1=matrot_from_Givens(givens);
+            (rot1.t() * kin * rot1).print("rot1.t()*kin*rot1()");
+            //std::reverse(givens.begin(),givens.end());
+            for(auto& g:givens) g.transposeInPlace();
+            auto gates=Fermionic::NOGates(sol.hamsys.sites,givens);
+            gateTEvol(gates,1,1,psi,{"Cutoff",1e-10,"Quiet",true, "DoNormalize",true});
+            cout<<"circuit2:"<<t0.sincemark()<<endl;
+            t0.mark();
+            rot = rot*rot1;
+            cc=rot1.t()*cc*rot1;
         }
 
         if (false && i%10==0) {// try Wannier of acitve orbitals:
@@ -442,6 +462,10 @@ int main(int argc, char **argv)
             rot.save("orb_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
             //exportPsi(psi,"psi_t"s+to_string(i)+".txt");
         }
+
+        cc.diag().print("ni");
+        inactive=arma::find(cc.diag()<1e-5 || cc.diag()>1-1e-5);
+        cout<<"active: "<<len-inactive.size()<<endl;
 
         for(auto i=0; i<psi.length(); i++)
             cout<<itensor::leftLinkIndex(psi,i+1).dim()<<" ";
