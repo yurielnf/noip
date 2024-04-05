@@ -289,6 +289,14 @@ arma::mat optimizeEntropyPair(itensor::MPS &psi, itensor::Fermion const& sites, 
     return rot1;
 }
 
+/// return a rotation rot such that rot(:,B).t()*kin*rot(:,B) is diagonal where B are the inactive eigenvectors of cc (with eval=0 or 1).
+arma::mat MagicRotation(arma::mat const& cc, arma::mat const& kin, double tolWannier=1e-5)
+{
+    arma::mat rot(size(cc), arma::fill::eye);
+
+
+    return rot;
+}
 
 /// ./irlm_nat_orb <len>
 int main(int argc, char **argv)
