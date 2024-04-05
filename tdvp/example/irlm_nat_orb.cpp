@@ -75,7 +75,7 @@ State rotateState3(itensor::MPS psi, arma::mat const& rot, int nExclude=2)
     auto [eval,evec]=eig_unitary(rott,nExclude);
 
 //    auto im=std::complex(0.,1.);
-//    arma::cx_mat(evec*diagmat(arma::log(eval)*im)*evec.t()).clean(1e-5).print("rotHam");
+//    arma::cx_mat(evec*diagmat(arma::log(eval)*im)*evec.t()).clean(tolWannier).print("rotHam");
 
     itensor::Fermion sites(psi.length(), {"ConserveNf=",true});
     psi.replaceSiteInds(sites.inds());
@@ -409,7 +409,7 @@ int main(int argc, char **argv)
         if (false && i%10==9) { // another circuit to diagonalize kin in the inactive sector
             cc.diag().print("ni");
             arma::mat kin=rot.t()*K*rot;
-            arma::uvec active=arma::find(cc.diag()>1e-5 && cc.diag()<1-1e-5);
+            arma::uvec active=arma::find(cc.diag()>tolWannier && cc.diag()<1-tolWannier);
             cout<<"active after circuit1: "<<active.size()<<endl;
             auto givens=Fermionic::GivensRotForMatrix(kin,active.size(),20);
             auto rot1=matrot_from_Givens(givens);
@@ -463,7 +463,7 @@ int main(int argc, char **argv)
         }
 
         cc.diag().raw_print("ni");
-        inactive=arma::find(cc.diag()<1e-5 || cc.diag()>1-1e-5);
+        inactive=arma::find(cc.diag()<tolWannier || cc.diag()>1-tolWannier);
         cout<<"active: "<<len-inactive.size()<<endl;
 
         for(auto i=0; i<psi.length(); i++)
