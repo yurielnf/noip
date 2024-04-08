@@ -281,6 +281,28 @@ struct Fermionic {
     }
 
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
+    static std::vector<GivensRot> GivensRotForRot(arma::mat rot)
+    {
+        using namespace arma;
+        std::vector<GivensRot> givens;
+        for(auto p2=rot.n_cols-1; p2>0u; p2--) {
+            arma::vec v=rot.col(p2);
+            std::vector<GivensRot> gs1;
+            for(auto i=0u; i+1<=p2; i++)
+            {
+                auto g=GivensRot(i).make(v[i],v[i+1]);
+                gs1.push_back(g);
+                v[i+1]=g.r;
+            }
+            auto rot1=matrot_from_Givens(gs1);
+            rot.rows(0,p2)=rot1*rot.rows(0,p2);
+            for(auto g : gs1) givens.push_back(g);
+        }
+        // rot.clean(1e-15).print("rot after extracting the Givens rotations");
+        return givens;
+    }
+
+    // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
     static std::vector<itensor::BondGate> NOGates(itensor::Fermion const& sites, std::vector<GivensRot> const& gs)
     {
         using itensor::BondGate;
