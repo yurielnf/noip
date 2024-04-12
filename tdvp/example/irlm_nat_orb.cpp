@@ -319,10 +319,11 @@ arma::mat MagicRotation(arma::mat const& cc, arma::mat const& kin, double tolWan
         mat evec;
         vec eval;
         eig_sym(eval,evec,X);
-        { //sort by absolute value
-            arma::uvec iev=arma::stable_sort_index(arma::abs(eval));
-            eval=eval(iev);
-            evec=evec.cols(iev);
+        { //sort by position
+            arma::mat xOp=arma::diagmat(arma::regspace(0,cc.n_rows-1));
+            vec x=(evec.t()*rot1.t()*xOp*rot1*evec).eval().diag();
+            uvec iev=stable_sort_index(x);
+            evec=evec.cols(iev).eval();
         }
         rot1=rot1*evec;
     }
@@ -332,8 +333,43 @@ arma::mat MagicRotation(arma::mat const& cc, arma::mat const& kin, double tolWan
     // (rot.t()*cc*rot).eval().clean(1e-15).print("cc rotated");
     // (rot.t()*kin*rot).eval().clean(1e-15).print("kin rotated");
 
+    // fix the sign
+    for(auto j=0u; j<rot.n_cols; j++) {
+        auto i=arma::index_max(arma::abs(rot.col(j)));
+        rot.col(j) /= arma::sign(rot(i,j));
+    }
+
+    cout<<"norm(1-rot)="<<norm(rot-arma::mat(size(rot),fill::eye))<<endl;
+
     return rot;
 }
+
+
+/// return a rotation to diagonize kin. The evec are sorted according to position
+arma::mat InactiveStarRotation(arma::mat const& kin)
+{
+    using namespace arma;
+    mat evec;
+    vec eval;
+    eig_sym(eval,evec,kin);
+
+    // sort by position
+    arma::mat xOp=arma::diagmat(arma::regspace(0,kin.n_rows-1));
+    vec x=(evec.t()*xOp*evec).eval().diag();
+    uvec iev=stable_sort_index(x);
+    mat rot=evec.cols(iev);
+
+    // fix the sign
+    for(auto j=0u; j<rot.n_cols; j++) {
+        auto i=arma::index_max(arma::abs(rot.col(j)));
+        rot.col(j) /= arma::sign(rot(i,j));
+    }
+
+    cout<<"norm(1-rot)="<<norm(rot-arma::mat(size(rot),fill::eye))<<endl;
+    return rot;
+}
+
+
 
 /// ./irlm_nat_orb <len>
 int main(int argc, char **argv)
@@ -441,7 +477,7 @@ int main(int argc, char **argv)
         cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
         //double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
-        if (false && i%10==9) {
+        if (true || i%10==9) {
             //auto rot1=Fermionic::rotNO3(cc,nExclude);
 //            psi=rotateState3(psi, rot1, nExclude).psi;
             auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,20);
@@ -450,7 +486,7 @@ int main(int argc, char **argv)
             //(rot1.t() * cc * rot1).print("rot1.t()*cc*rot1");
             auto gates=Fermionic::NOGates(sol.hamsys.sites,givens);
             gateTEvol(gates,1,1,psi,{"Cutoff",1e-10,"Quiet",true, "DoNormalize",true});
-            cout<<"circuit:"<<t0.sincemark()<<endl;
+            cout<<"circuit1:"<<t0.sincemark()<<endl;
             t0.mark();
             //cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
             //cc.print("cc after rot");
@@ -476,7 +512,7 @@ int main(int argc, char **argv)
             cc=rot1*cc*rot1.t();
         }
 
-        if (true || i%10==9) {// the magic circuit!
+        if (false && i%10==9) {// the magic circuit!
             arma::mat magicr=MagicRotation(cc.submat(nExcludeGs,nExcludeGs,len-1,len-1),
                                        rot.tail_cols(len-nExcludeGs).t()*K*rot.tail_cols(len-nExcludeGs));
             auto givens=Fermionic::GivensRotForRot(magicr);
@@ -490,6 +526,30 @@ int main(int argc, char **argv)
             t0.mark();
             //cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
             //cc.print("cc after rot");
+            rot = rot*rot1.t();
+            cc=rot1*cc*rot1.t();
+        }
+
+        if (true || i%10==9) {// diagonalize kin inactive
+            int nActive=arma::find(cc.diag()>=tolWannier && cc.diag()<=1-tolWannier).eval().size();
+            arma::mat kin=rot.tail_cols(len-nActive).t()*K*rot.tail_cols(len-nActive);
+            arma::mat magicr=InactiveStarRotation(kin);
+            auto givens=Fermionic::GivensRotForRot(magicr);
+            for(auto &g : givens) g.b+=nActive;
+//            auto givens=Fermionic::GivensRotForMatrix(cc,nExcludeGs,20);
+            auto rot1=matrot_from_Givens(givens,cc.n_rows);
+            //(rot1.t() * cc * rot1).print("rot1.t()*cc*rot1");
+            auto gates=Fermionic::NOGates(sol.hamsys.sites,givens);
+            gateTEvol(gates,1,1,psi,{"Cutoff",1e-10,"Quiet",true, "DoNormalize",true});
+            cout<<"circuit2:"<<t0.sincemark()<<endl;
+            t0.mark();
+            //cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
+            //cc.print("cc after rot");
+            // cout<<"nActive="<<nActive<<endl;
+            // cout<<"rot to kin "<<magicr.n_rows<<endl;
+            // cout<<"rot1 "<<rot1.n_rows<<endl;
+            // cout.flush();
+
             rot = rot*rot1.t();
             cc=rot1*cc*rot1.t();
         }
