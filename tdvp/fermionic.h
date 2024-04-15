@@ -118,6 +118,12 @@ struct HamSys {
     itensor::MPO hamEnrich;
 };
 
+struct HamSysV {
+    itensor::Fermion sites;
+    std::vector<itensor::MPO> ham;
+    std::vector<itensor::MPO> hamEnrich;
+};
+
 struct HamSysExact {
     itensor::Fermion sites;
     itensor::AutoMPO ampo;
@@ -152,6 +158,21 @@ struct Fermionic {
                     h += Kmat(i,j),"Cdag",i+1,"C",j+1;
     }
 
+    std::vector<itensor::MPO> KinV() const
+    {
+        int L=length();
+        std::vector<itensor::MPO> h;
+        // kinetic energy bath
+        for(int i=0;i<L; i++) {
+            itensor::AutoMPO ampo(sites);
+            for(int j=0;j<L; j++)
+                if (fabs(Kmat(i,j))>1e-15)
+                    ampo += Kmat(i,j),"Cdag",i+1,"C",j+1;
+            h.push_back(itensor::toMPO(ampo));
+        }
+        return h;
+    }
+
     void Interaction(itensor::AutoMPO& h) const
     {
         if (Umat.empty() && Vijkl.empty()) return;
@@ -161,6 +182,25 @@ struct Fermionic {
             for(int j=0;j<Umat.n_cols; j++)
                 if (fabs(Umat(i,j))>1e-15)
                     h += Umat(i,j),"Cdag",i+1,"C",i+1,"Cdag",j+1,"C",j+1;
+
+        for(const auto& [pos,coeff] : Vijkl)
+            if (fabs(coeff)>1e-15)
+                h += coeff,"Cdag",pos[0]+1,"C",pos[1]+1,"Cdag",pos[2]+1,"C",pos[3]+1;
+    }
+
+    std::vector<itensor::MPO> InteractionV() const
+    {
+        if (Umat.empty() && Vijkl.empty()) return {};
+        if (!Rot.empty()) throw std::invalid_argument("rot of interactionV is not implemented yet");
+
+        std::vector<itensor::MPO> h;
+        // Uij ni nj
+        for(int i=0;i<Umat.n_rows; i++) {
+            itensor::AutoMPO ampo(sites);
+            for(int j=0;j<Umat.n_cols; j++)
+                if (fabs(Umat(i,j))>1e-15)
+                    ampo += Umat(i,j),"Cdag",i+1,"C",i+1,"Cdag",j+1,"C",j+1;
+            h.push_back()
 
         for(const auto& [pos,coeff] : Vijkl)
             if (fabs(coeff)>1e-15)
@@ -191,6 +231,14 @@ struct Fermionic {
         Kin(h);
         Interaction(h);
         return {sites, itensor::toMPO(h)};
+    }
+
+    HamSysV HamV() const
+    {
+        std::vector<itensor::MPO> hk=KinV();
+        std::vector<itensor::MPO> hi=InteractionV();
+        for(auto x:hi) hk.push_back(x);
+        return {sites, hk};
     }
 
     static arma::mat cc_matrix(itensor::MPS const& gs, itensor::Fermion const& sites)

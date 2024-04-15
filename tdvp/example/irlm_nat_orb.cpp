@@ -530,7 +530,7 @@ int main(int argc, char **argv)
             cc=rot1*cc*rot1.t();
         }
 
-        if (true || i%10==9) {// diagonalize kin inactive
+        if (false && i%10==9) {// diagonalize kin inactive
             int nActive=arma::find(cc.diag()>=tolWannier && cc.diag()<=1-tolWannier).eval().size();
             arma::mat kin=rot.tail_cols(len-nActive).t()*K*rot.tail_cols(len-nActive);
             arma::mat magicr=InactiveStarRotation(kin);

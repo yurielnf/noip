@@ -53,8 +53,25 @@ struct IRLM {
             return Fermionic(K,Umat,rot);
         }();
         HamSys hsys=sys.Ham();
+        if (iInactive.empty()) return hsys;
         sys.Kmat.submat(iInactive,iInactive).fill(0);
         hsys.hamEnrich=sys.Ham().ham;
+        return hsys;
+    }
+
+    HamSysV HamV(arma::mat const& rot={}, bool rotateOnlyKin=false, arma::uvec iInactive={}) const
+    {
+        arma::mat K,Umat;
+        std::tie(K,Umat)=matrices();
+        Fermionic sys=[&]() {
+            if (rot.empty()) return Fermionic(K,Umat);
+            if (rotateOnlyKin) return Fermionic(rot.t()*K*rot, Umat);
+            return Fermionic(K,Umat,rot);
+        }();
+        HamSys hsys=sys.HamV();
+        if (iInactive.empty()) return hsys;
+        sys.Kmat.submat(iInactive,iInactive).fill(0);
+        hsys.hamEnrich=sys.HamV().ham;
         return hsys;
     }
 
