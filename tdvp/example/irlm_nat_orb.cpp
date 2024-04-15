@@ -452,11 +452,11 @@ int main(int argc, char **argv)
     out<<"time M m energy n0\n"<<setprecision(14);
     double n0=itensor::expectC(sol1.psi, sol1.hamsys.sites, "N",{1}).at(0).real();
     out<<"0 "<< maxLinkDim(sys1.ham) <<" "<<maxLinkDim(sol1.psi)<<" "<<sol1.energy<<" "<<n0<<endl;
-    arma::uvec inactive;
+    arma::uvec inactive=arma::find(cc.diag()<tolWannier || cc.diag()>1-tolWannier);
     for(auto i=0; i<len*10/2; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         itensor::cpu_time t0;
-        auto sys2=model2.Ham(rot, nExclude==2, inactive);
+        auto sys2=model2.HamV(rot, nExclude==2, inactive);
         cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
         it_tdvp sol {sys2, psi};
@@ -480,7 +480,7 @@ int main(int argc, char **argv)
         if (true || i%10==9) {
             //auto rot1=Fermionic::rotNO3(cc,nExclude);
 //            psi=rotateState3(psi, rot1, nExclude).psi;
-            auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,20);
+            auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,16);
 //            auto givens=Fermionic::GivensRotForMatrix(cc,nExcludeGs,20);
             auto rot1=matrot_from_Givens(givens,cc.n_rows);
             //(rot1.t() * cc * rot1).print("rot1.t()*cc*rot1");
@@ -584,7 +584,7 @@ int main(int argc, char **argv)
 
         psi.orthogonalize({"Cutoff",1e-9});
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
-        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(psi)<<" "<<sol.energy<<" "<<n0<<endl;
+        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.hamEnrich) <<" "<<maxLinkDim(psi)<<" "<<sol.energy<<" "<<n0<<endl;
 
         if (true && i%100==0) {
             cc.save("cc_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);

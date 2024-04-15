@@ -121,7 +121,7 @@ struct HamSys {
 struct HamSysV {
     itensor::Fermion sites;
     std::vector<itensor::MPO> ham;
-    std::vector<itensor::MPO> hamEnrich;
+    itensor::MPO hamEnrich;
 };
 
 struct HamSysExact {
@@ -168,7 +168,7 @@ struct Fermionic {
             for(int j=0;j<L; j++)
                 if (fabs(Kmat(i,j))>1e-15)
                     ampo += Kmat(i,j),"Cdag",i+1,"C",j+1;
-            h.push_back(itensor::toMPO(ampo));
+            if (ampo.size()) h.push_back(itensor::toMPO(ampo));
         }
         return h;
     }
@@ -200,11 +200,15 @@ struct Fermionic {
             for(int j=0;j<Umat.n_cols; j++)
                 if (fabs(Umat(i,j))>1e-15)
                     ampo += Umat(i,j),"Cdag",i+1,"C",i+1,"Cdag",j+1,"C",j+1;
-            h.push_back()
+            if (ampo.size()) h.push_back(itensor::toMPO(ampo));
+        }
 
+        itensor::AutoMPO ampo(sites);
         for(const auto& [pos,coeff] : Vijkl)
             if (fabs(coeff)>1e-15)
-                h += coeff,"Cdag",pos[0]+1,"C",pos[1]+1,"Cdag",pos[2]+1,"C",pos[3]+1;
+                ampo += coeff,"Cdag",pos[0]+1,"C",pos[1]+1,"Cdag",pos[2]+1,"C",pos[3]+1;
+        if (ampo.size()) h.push_back(itensor::toMPO(ampo));
+        return h;
     }
 
     void InteractionRot(itensor::AutoMPO& h) const
@@ -237,7 +241,7 @@ struct Fermionic {
     {
         std::vector<itensor::MPO> hk=KinV();
         std::vector<itensor::MPO> hi=InteractionV();
-        for(auto x:hi) hk.push_back(x);
+        for(auto const& x:hi) hk.push_back(x);
         return {sites, hk};
     }
 

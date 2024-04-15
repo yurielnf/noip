@@ -5,6 +5,7 @@
 #include "tdvp.h"
 #include "basisextension.h"
 
+template<class HamS>
 struct it_tdvp {
     int bond_dim=64;
     int nIter_diag=32;
@@ -18,13 +19,20 @@ struct it_tdvp {
 
     int nsweep=0;
     double energy=0;
-    HamSys hamsys;
+    HamS hamsys;
     itensor::MPS psi;
 
-    it_tdvp(HamSys const& hamsys_, itensor::MPS const& psi_) : hamsys(hamsys_), psi(psi_)
+    it_tdvp(HamS const& hamsys_, itensor::MPS const& psi_) : hamsys(hamsys_), psi(psi_)
     {
         psi.replaceSiteInds(hamsys.sites.inds());
-        energy=std::real(itensor::innerC(psi, hamsys.ham, psi));
+        if constexpr (std::is_same_v<HamS,HamSys>)
+            energy=std::real(itensor::innerC(psi, hamsys.ham, psi));
+        else {
+            energy=0;
+            for(auto const& x:hamsys.ham)
+                energy += std::real(itensor::innerC(psi, x, psi));
+        }
+
     }
 
     std::complex<double> time() const { return dt * static_cast<double>(nsweep); }
@@ -41,8 +49,9 @@ struct it_tdvp {
             // Global subspace expansion
 //            std::vector<double> epsilonK(3,1E-8);
             std::vector<int> maxDimK(3,0.5*itensor::maxLinkDim(psi));
-            const itensor::MPO& hE= hamsys.hamEnrich.length()==0 ? hamsys.ham : hamsys.hamEnrich;
-            addBasis(psi,hE,maxDimK,
+
+            if (hamsys.hamEnrich.length()==0) throw std::invalid_argument("hamsys.hamEnrich need to be defined for tdvp");
+            itensor::addBasis(psi,hamsys.hamEnrich,maxDimK,
                      {"Cutoff",epsilonM,
                       "Method",enrichByFit ? "Fit" : "DensityMatrix",
                       "KrylovOrd",3,

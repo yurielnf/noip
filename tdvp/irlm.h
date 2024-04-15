@@ -68,10 +68,10 @@ struct IRLM {
             if (rotateOnlyKin) return Fermionic(rot.t()*K*rot, Umat);
             return Fermionic(K,Umat,rot);
         }();
-        HamSys hsys=sys.HamV();
-        if (iInactive.empty()) return hsys;
+        HamSysV hsys=sys.HamV();
+        if (iInactive.empty()) return hsys;  // normal path
         sys.Kmat.submat(iInactive,iInactive).fill(0);
-        hsys.hamEnrich=sys.HamV().ham;
+        hsys.hamEnrich=sys.Ham().ham;
         return hsys;
     }
 
