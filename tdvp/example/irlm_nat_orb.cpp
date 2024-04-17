@@ -428,6 +428,7 @@ int main(int argc, char **argv)
         arma::uvec iev=arma::stable_sort_index(activity.clean(1e-15));
         tolWannier=sqrt(activity(iev.at(nExcludeGs-nExclude-1))*activity(iev.at(nExcludeGs-nExclude))); // in the middle (logscale)
     }
+    nExcludeGs=12; // the best run we have
     cout<<"\nNumber of active orbitals of the future gs, tol: "<<nExcludeGs<<", "<<tolWannier<<endl;
 
 
@@ -456,7 +457,7 @@ int main(int argc, char **argv)
     for(auto i=0; i<len*10/2; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         itensor::cpu_time t0;
-        auto sys2=model2.HamV(rot, nExclude==2, inactive);
+        auto sys2=model2.Ham(rot, nExclude==2, inactive);
         cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
         it_tdvp sol {sys2, psi};
