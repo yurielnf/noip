@@ -144,6 +144,7 @@ struct Fermionic {
               arma::mat const& Rot_, bool rotateKin=true)
         : Kmat(rotateKin ? Rot_.t()*Kmat_*Rot_ : Kmat_)
         , Umat(Umat_), Rot(Rot_)
+        , sites(Kmat_.n_rows, {"ConserveNf=",true})
     {}
 
     int length() const { return Kmat.n_rows; }
