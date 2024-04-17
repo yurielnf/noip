@@ -161,14 +161,15 @@ struct Fermionic {
     std::vector<itensor::MPO> KinV() const
     {
         int L=length();
-        std::vector<itensor::MPO> h;
+        std::vector<itensor::MPO> h(L);
         // kinetic energy bath
+        #pragma omp parallel for
         for(int i=0;i<L; i++) {
             itensor::AutoMPO ampo(sites);
             for(int j=0;j<L; j++)
                 if (fabs(Kmat(i,j))>1e-15)
                     ampo += Kmat(i,j),"Cdag",i+1,"C",j+1;
-            if (ampo.size()) h.push_back(itensor::toMPO(ampo));
+            h[i]=itensor::toMPO(ampo);
         }
         return h;
     }

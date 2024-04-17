@@ -457,7 +457,7 @@ int main(int argc, char **argv)
     for(auto i=0; i<len*10/2; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         itensor::cpu_time t0;
-        auto sys2=model2.Ham(rot, nExclude==2, inactive);
+        auto sys2=model2.HamV(rot, nExclude==2, inactive);
         cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
         it_tdvp sol {sys2, psi};
@@ -587,13 +587,13 @@ int main(int argc, char **argv)
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
         out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.hamEnrich) <<" "<<maxLinkDim(psi)<<" "<<sol.energy<<" "<<n0<<endl;
 
-        if (true && i%100==0) {
+        if (false && i%100==0) {
             cc.save("cc_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
             rot.save("orb_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
             //exportPsi(psi,"psi_t"s+to_string(i)+".txt");
         }
 
-        arma::join_horiz(cc.diag(),(rot.t()*K*rot).eval().diag()).print("ni kin.diag()");
+//        arma::join_horiz(cc.diag(),(rot.t()*K*rot).eval().diag()).print("ni kin.diag()");
         inactive=arma::find(cc.diag()<tolWannier || cc.diag()>1-tolWannier);
         cout<<"active: "<<len-inactive.size()<<endl;
 
