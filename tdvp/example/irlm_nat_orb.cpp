@@ -478,7 +478,7 @@ int main(int argc, char **argv)
         cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
         //double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
-        if (true || i%10==9) {
+        if (false) {
             //auto rot1=Fermionic::rotNO3(cc,nExclude);
 //            psi=rotateState3(psi, rot1, nExclude).psi;
             auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,16);
@@ -495,14 +495,14 @@ int main(int argc, char **argv)
             cc=rot1*cc*rot1.t();
         }
 
-        if (false && i%10==9) { // another circuit to diagonalize kin in the inactive sector
+        if (false) { // another circuit to diagonalize kin in the inactive sector
             cc.diag().print("ni");
             arma::mat kin=rot.t()*K*rot;
             arma::uvec active=arma::find(cc.diag()>tolWannier && cc.diag()<1-tolWannier);
             cout<<"active after circuit1: "<<active.size()<<endl;
-            auto givens=Fermionic::GivensRotForMatrix(kin,active.size(),20);
-            auto rot1=matrot_from_Givens(givens);
-            (rot1 * kin * rot1.t()).print("rot1.t()*kin*rot1");
+            auto givens=Fermionic::GivensRotForMatrix(kin,active.size(),16);
+            auto rot1=matrot_from_Givens(givens,cc.n_rows);
+            //(rot1 * kin * rot1.t()).print("rot1.t()*kin*rot1");
             //std::reverse(givens.begin(),givens.end());
             //for(auto& g:givens) g.transposeInPlace();
             auto gates=Fermionic::NOGates(sol.hamsys.sites,givens);
@@ -513,7 +513,7 @@ int main(int argc, char **argv)
             cc=rot1*cc*rot1.t();
         }
 
-        if (false && i%10==9) {// the magic circuit!
+        if (true) {// the magic circuit!
             arma::mat magicr=MagicRotation(cc.submat(nExcludeGs,nExcludeGs,len-1,len-1),
                                        rot.tail_cols(len-nExcludeGs).t()*K*rot.tail_cols(len-nExcludeGs));
             auto givens=Fermionic::GivensRotForRot(magicr);
@@ -585,7 +585,7 @@ int main(int argc, char **argv)
 
         psi.orthogonalize({"Cutoff",1e-9});
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
-        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.hamEnrich) <<" "<<maxLinkDim(psi)<<" "<<sol.energy<<" "<<n0<<endl;
+        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(psi)<<" "<<sol.energy<<" "<<n0<<endl;
 
         if (false && i%100==0) {
             cc.save("cc_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);

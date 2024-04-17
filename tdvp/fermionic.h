@@ -302,7 +302,7 @@ struct Fermionic {
     }
 
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
-    static std::vector<GivensRot> GivensRotForMatrix(arma::mat const& cc, int nExclude=2, size_t blockSize=8)
+    static std::vector<GivensRot> GivensRotForMatrix(arma::mat const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10)
     {
         using namespace arma;
         arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
@@ -319,6 +319,7 @@ struct Fermionic {
             auto [i0,j0]=bestMatching(conv_to<std::vector<double>>::from(eval), evalRef);
             evalRef.erase(evalRef.begin()+j0);
             arma::vec v=evec.col(i0);
+            if (1-std::abs(v.back())<tolEvec) continue; // already done
             std::vector<GivensRot> gs1;
             for(auto i=0u; i+1<v.size(); i++)
             {
