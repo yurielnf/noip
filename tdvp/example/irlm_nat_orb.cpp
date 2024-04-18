@@ -432,11 +432,21 @@ int main(int argc, char **argv)
     cout<<"\nNumber of active orbitals of the future gs, tol: "<<nExcludeGs<<", "<<tolWannier<<endl;
 
 
+    {
+        arma::mat rot1p=MagicRotation(cc.submat(nExcludeGs,nExcludeGs,len-1,len-1),
+                                   rot.tail_cols(len-nExcludeGs).t()*K*rot.tail_cols(len-nExcludeGs));
+        arma::mat rot1(arma::size(rot),arma::fill::eye);
+        rot1.submat(nExcludeGs,nExcludeGs,len-1,len-1)=rot1p;
+        rot = rot*rot1;
+        xOp=rot1.t()*xOp*rot1;
+        cc=rot1.t()*cc*rot1;
+    }
+
     cout<<"\n-------------------------- find the gs1 in NO2 ----------------\n";
 
-    rot1=Fermionic::rotNO3(cc,xOp,nExclude,tolWannier);
-    rot = rot*rot1;
-    xOp=rot1.t()*xOp*rot1;
+//    rot1=Fermionic::rotNO3(cc,xOp,nExclude,tolWannier);
+//    rot = rot*rot1;
+//    xOp=rot1.t()*xOp*rot1;
     (rot.t()*K*rot).eval().clean(1e-15).save("kin_L"s+to_string(len)+"_NOgs2.txt",arma::raw_ascii);
     auto sys1=model1.Ham(rot, nExclude==2);
     auto sol1=computeGS(sys1);
