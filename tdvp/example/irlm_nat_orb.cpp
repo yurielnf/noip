@@ -432,7 +432,7 @@ int main(int argc, char **argv)
     cout<<"\nNumber of active orbitals of the future gs, tol: "<<nExcludeGs<<", "<<tolWannier<<endl;
 
 
-    {
+    /*{
         arma::mat rot1p=MagicRotation(cc.submat(nExcludeGs,nExcludeGs,len-1,len-1),
                                    rot.tail_cols(len-nExcludeGs).t()*K*rot.tail_cols(len-nExcludeGs));
         arma::mat rot1(arma::size(rot),arma::fill::eye);
@@ -440,13 +440,14 @@ int main(int argc, char **argv)
         rot = rot*rot1;
         xOp=rot1.t()*xOp*rot1;
         cc=rot1.t()*cc*rot1;
-    }
+    }*/
 
     cout<<"\n-------------------------- find the gs1 in NO2 ----------------\n";
-
-//    rot1=Fermionic::rotNO3(cc,xOp,nExclude,tolWannier);
-//    rot = rot*rot1;
-//    xOp=rot1.t()*xOp*rot1;
+    {
+        rot1=Fermionic::rotNO3(cc,xOp,nExclude,tolWannier);
+        rot = rot*rot1;
+        xOp=rot1.t()*xOp*rot1;
+    }
     (rot.t()*K*rot).eval().clean(1e-15).save("kin_L"s+to_string(len)+"_NOgs2.txt",arma::raw_ascii);
     auto sys1=model1.Ham(rot, nExclude==2);
     auto sol1=computeGS(sys1);
@@ -488,7 +489,7 @@ int main(int argc, char **argv)
         cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
         //double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
-        if (false) {
+        if (true) {
             //auto rot1=Fermionic::rotNO3(cc,nExclude);
 //            psi=rotateState3(psi, rot1, nExclude).psi;
             auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,16);
@@ -523,7 +524,7 @@ int main(int argc, char **argv)
             cc=rot1*cc*rot1.t();
         }
 
-        if (true) {// the magic circuit!
+        if (false) {// the magic circuit!
             arma::mat magicr=MagicRotation(cc.submat(nExcludeGs,nExcludeGs,len-1,len-1),
                                        rot.tail_cols(len-nExcludeGs).t()*K*rot.tail_cols(len-nExcludeGs));
             auto givens=Fermionic::GivensRotForRot(magicr);

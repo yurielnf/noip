@@ -61,7 +61,7 @@ struct it_tdvp {
         }
 
         // TDVP sweep
-        energy = tdvp(psi,hamsys.ham,-dt,sweeps,
+        energy = tdvp(psi,hamsys.hamEnrich,-dt,sweeps,
                       {"Truncate",true,
                        "DoNormalize", do_normalize,
                        "Quiet",true,
