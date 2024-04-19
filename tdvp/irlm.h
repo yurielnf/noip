@@ -43,6 +43,22 @@ struct IRLM {
         return Rfull;
     }
 
+    /// the Hamiltonian setting the kinetic(inactive,inactive)=0
+    HamSys HamRestricted(arma::mat const& rot={}, bool rotateOnlyKin=false, arma::uvec iInactive={}) const
+    {
+        arma::mat K,Umat;
+        std::tie(K,Umat)=matrices();
+        Fermionic sys=[&]() {
+            if (rot.empty()) return Fermionic(K,Umat);
+            if (rotateOnlyKin) return Fermionic(rot.t()*K*rot, Umat);
+            return Fermionic(K,Umat,rot);
+        }();
+        sys.Kmat.submat(iInactive,iInactive).fill(0);
+        auto hsys=sys.Ham();
+        hsys.hamEnrich=hsys.ham;
+        return hsys;
+    }
+
     HamSys Ham(arma::mat const& rot={}, bool rotateOnlyKin=false, arma::uvec iInactive={}) const
     {
         arma::mat K,Umat;
