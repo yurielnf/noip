@@ -106,16 +106,28 @@ auto computeGS(HamSys const& sys)
 {
     cout<<"bond dimension of H: "<< maxLinkDim(sys.ham) << endl;
     it_dmrg sol_gs {sys};
-    sol_gs.bond_dim=64;
+    sol_gs.bond_dim=512;
     sol_gs.noise=1e-5;
     cout<<"\nsweep bond-dim energy\n";
-    for(auto i=0u; i<10; i++) {
-        if (i==3) {
-            sol_gs.noise=1e-10;
-//            sol_gs.nIter_diag=2;
+    for(auto i=0u; i<30; i++) {
+        if (i==10) sol_gs.noise=1e-7;
+        else if (i==26) sol_gs.noise=1e-9;
+        else if (i==28) sol_gs.noise=0;
+        if (false && i==11) {
+            // Global subspace expansion
+//            std::vector<double> epsilonK(3,1E-8);
+            std::vector<int> maxDimK(3,0.5*itensor::maxLinkDim(sol_gs.psi));
+
+            itensor::addBasis(sol_gs.psi,sol_gs.hamsys.ham,maxDimK,
+                     {"Cutoff", 1e-9,
+                      "Method", "DensityMatrix",
+                      "KrylovOrd",3,
+                      "DoNormalize", true,
+                      "Quiet",true,
+                      "Silent",true});
         }
-        else if (i==9) sol_gs.noise=0;
         sol_gs.iterate();
+        //sol_gs.psi.orthogonalize({"Cutoff",1e-9});
         cout<<i+1<<" "<<maxLinkDim(sol_gs.psi)<<" "<<sol_gs.energy<<endl;
     }
     for(auto i=0; i<sol_gs.psi.length(); i++)
@@ -394,7 +406,6 @@ int main(int argc, char **argv)
     {
         arma::mat Umat;
         std::tie(K,Umat)=model2.matrices();
-        K=rot.t()*K*rot;
     }
 
 
@@ -410,14 +421,14 @@ int main(int argc, char **argv)
     int nExcludeGs=nExclude;
     //auto rot1=Fermionic::rotNO3(cc,xOp,nExclude,tolWannier);
     //(rot1.t()*cc*rot1).eval().save("cc_L"s+to_string(len)+"_gs2_star_noW.txt",arma::raw_ascii);
-    {
+    {        
+        arma::mat kin=rot.t()*K*rot;
         arma::mat rot1p=MagicRotation(cc.submat(nExcludeGs,nExcludeGs,len-1,len-1),
-                                      K.submat(nExcludeGs,nExcludeGs,len-1,len-1),
+                                      kin.submat(nExcludeGs,nExcludeGs,len-1,len-1),
                                       tolWannier);
         arma::mat rot1(arma::size(rot),arma::fill::eye);
         rot1.submat(nExcludeGs,nExcludeGs,len-1,len-1)=rot1p;
         rot = rot*rot1;
-        K=rot1.t()*K*rot1;
     }
 
     auto sys2b=model2.Ham(rot, nExclude==2);
@@ -440,30 +451,41 @@ int main(int argc, char **argv)
     cout<<"\nNumber of active orbitals of the future gs, tol: "<<nExcludeGs<<", "<<tolWannier<<endl;
 
     cout<<"\n-------------------------- find the gs1 in NO2 ----------------\n";
-    {
+    {        
+        arma::mat kin=rot.t()*K*rot;
         arma::mat rot1p=MagicRotation(cc.submat(nExcludeGs,nExcludeGs,len-1,len-1),
-                                      K .submat(nExcludeGs,nExcludeGs,len-1,len-1),
+                                      kin.submat(nExcludeGs,nExcludeGs,len-1,len-1),
                                       tolWannier);
         arma::mat rot1(arma::size(rot),arma::fill::eye);
         rot1.submat(nExcludeGs,nExcludeGs,len-1,len-1)=rot1p;
         rot = rot*rot1;
-        K=rot1.t()*K*rot1;
     }
-    auto sys1=model1.Ham(rot, nExclude==2);
-    auto sol1=computeGS(sys1);
-    cc=Fermionic::cc_matrix(sol1.psi, sol1.hamsys.sites);
+    auto sys1a=model1.Ham(rot, nExclude==2);
+    auto sol1a=computeGS(sys1a);
+    cc=Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites);
 
     //cc.save("cc_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
     //rot.save("orb_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
     //exportPsi(sol1b.psi,"psi_t"s+to_string(0)+".txt");
 
-    cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
+    cout<<"\n-------------------------- find again the gs1 in NO1 while keeping the active NO2 ----------------\n";
+    if (true) { // circuit1
+        auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,10);
+        auto rot1=matrot_from_Givens(givens,cc.n_rows);
+        rot = rot*rot1.t();
+        cc=rot1*cc*rot1.t();
+    }
+    auto sys1b=model1.Ham(rot, nExclude==2);
+    auto sol1b=computeGS(sys1b);
 
-    auto psi=sol1.psi;
+    cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
+    tolWannier=1e-9;
+    auto psi=sol1b.psi;
+
     ofstream out("irlm_no_L"s+to_string(len)+".txt");
     out<<"time M m energy n0\n"<<setprecision(14);
-    double n0=itensor::expectC(sol1.psi, sol1.hamsys.sites, "N",{1}).at(0).real();
-    out<<"0 "<< maxLinkDim(sys1.ham) <<" "<<maxLinkDim(sol1.psi)<<" "<<sol1.energy<<" "<<n0<<endl;
+    double n0=itensor::expectC(psi, sol1b.hamsys.sites, "N",{1}).at(0).real();
+    out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<endl;
     arma::uvec inactive=arma::find(cc.diag()<=tolWannier || cc.diag()>=1-tolWannier);
     for(auto i=0; i<len*10/2; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
@@ -525,8 +547,9 @@ int main(int argc, char **argv)
         }
 
         if (false) {// the magic circuit!
+            arma::mat kin=rot.t()*K*rot;
             arma::mat magicr=MagicRotation(cc.submat(nExcludeGs,nExcludeGs,len-1,len-1),
-                                           rot.tail_cols(len-nExcludeGs).t()*K*rot.tail_cols(len-nExcludeGs),
+                                           kin.submat(nExcludeGs,nExcludeGs,len-1,len-1),
                                            tolWannier);
             auto givens=Fermionic::GivensRotForRot(magicr);
             for(auto &g : givens) g.b+=nExcludeGs;
