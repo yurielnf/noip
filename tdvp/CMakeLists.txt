@@ -28,7 +28,8 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 
 
 
-target_link_libraries(${PROJECT_NAME} PUBLIC "-Wl,--start-group" ${MKL_SEQUENTIAL_LAYER_LIBRARY} "-Wl,--end-group -lpthread -lm -ldl" tdvp itensor OpenMP::OpenMP_CXX)
+#target_link_libraries(${PROJECT_NAME} PUBLIC "-Wl,--start-group" ${MKL_SEQUENTIAL_LAYER_LIBRARY} "-Wl,--end-group -lpthread -lm -ldl" tdvp itensor OpenMP::OpenMP_CXX)
+target_link_libraries(${PROJECT_NAME} PUBLIC "-Wl,--start-group" $ENV{MKLROOT}/lib/intel64/libmkl_rt.so "-Wl,--end-group -Wl,--no-as-needed -lpthread -lm -ldl" tdvp itensor OpenMP::OpenMP_CXX)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC armadillo)
 
