@@ -11,12 +11,13 @@ struct IRLM {
     double V=0.15;
     double U=-0.5;
     double ed=0;
+    bool connected=true;
 
     auto matrices() const
     {
         // Kinetic energy TB Hamiltonian
         arma::mat K(L,L,arma::fill::zeros);
-        for(auto i=1; i<L-1; i++)
+        for(auto i=1+!connected; i<L-1; i++)
             K(i,i+1)=K(i+1,i)=t;
         K(0,1)=K(1,0)=V;
         K(0,0)=ed;
