@@ -389,7 +389,7 @@ int main(int argc, char **argv)
 //    TestGivens();
     int len=20, nExclude=2;
     if (argc==2) len=atoi(argv[1]);
-    auto model1=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=-10};
+    auto model1=IRLM {.L=len, .t=0.5, .V=0.0, .U=0.25, .ed=-10, .connected=false};
     auto model2=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=0.0};
 
     cout<<"\n-------------------------- solve the gs2 ----------------\n" << setprecision(15);
@@ -399,8 +399,8 @@ int main(int argc, char **argv)
 
     //arma::mat xOp=arma::diagmat(arma::regspace(0,len-1));
     auto cc=Fermionic::cc_matrix(sol2a.psi, sol2a.hamsys.sites);
-    //cc.save("cc_L"s+to_string(len)+"_gs2_star.txt",arma::raw_ascii);
-    //rot.save("orb_L"s+to_string(len)+"_gs2_star.txt",arma::raw_ascii);
+    cc.save("cc_L"s+to_string(len)+"_gs2_star.txt",arma::raw_ascii);
+    rot.save("orb_L"s+to_string(len)+"_gs2_star.txt",arma::raw_ascii);
 
     arma::mat K;
     {
@@ -464,8 +464,8 @@ int main(int argc, char **argv)
     auto sol1a=computeGS(sys1a);
     cc=Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites);
 
-    //cc.save("cc_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
-    //rot.save("orb_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
+    cc.save("cc_L"s+to_string(len)+"_gs1.txt",arma::raw_ascii);
+    rot.save("orb_L"s+to_string(len)+"_gs1.txt",arma::raw_ascii);
     //exportPsi(sol1b.psi,"psi_t"s+to_string(0)+".txt");
 
     cout<<"\n-------------------------- find again the gs1 in NO1 while keeping the active NO2 ----------------\n";
@@ -477,6 +477,12 @@ int main(int argc, char **argv)
     }
     auto sys1b=model1.Ham(rot, nExclude==2);
     auto sol1b=computeGS(sys1b);
+    cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites);
+
+    cc.save("cc_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
+    rot.save("orb_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
+
+    return 0;
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
     tolWannier=1e-9;
