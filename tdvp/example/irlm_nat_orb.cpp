@@ -516,10 +516,10 @@ int main(int argc, char **argv)
         cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
         //double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
-        if (true) {
+        for(auto k=0; k<1; k++) {
             //auto rot1=Fermionic::rotNO3(cc,nExclude);
 //            psi=rotateState3(psi, rot1, nExclude).psi;
-            auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,10);
+            auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,20);
 //            auto givens=Fermionic::GivensRotForMatrix(cc,nExcludeGs,20);
             auto rot1=matrot_from_Givens(givens,cc.n_rows);
             //(rot1.t() * cc * rot1).print("rot1.t()*cc*rot1");

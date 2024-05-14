@@ -12,13 +12,13 @@ FetchContent_Declare(
   GIT_TAG        11.4.x
 )
 
-#FetchContent_Declare(
-#  carma
-#  GIT_REPOSITORY https://github.com/RUrlus/carma.git
-#  GIT_TAG        stable
-#)
+FetchContent_Declare(
+ carma
+ GIT_REPOSITORY https://github.com/RUrlus/carma.git
+ GIT_TAG        stable
+)
 
-FetchContent_MakeAvailable(pybind11 armadillo)
+FetchContent_MakeAvailable(pybind11 armadillo carma)
 
 
 add_library(itensor STATIC IMPORTED) # or STATIC instead of SHARED
