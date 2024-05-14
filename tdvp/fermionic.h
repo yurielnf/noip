@@ -278,6 +278,7 @@ struct Fermionic {
             std::vector<GivensRot> gs1;
             for(auto i=0u; i+1<v.size(); i++)
             {
+                if (std::abs(v[i])<tolEvec) continue; // already done
                 auto b=i+p1;
                 auto g=GivensRot(b).make(v[i],v[i+1]);
                 gs1.push_back(g);

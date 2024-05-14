@@ -39,4 +39,4 @@ add_subdirectory(example)
 
 ##------------ wrapper ----------
 
-add_subdirectory(python)
+#add_subdirectory(python)
