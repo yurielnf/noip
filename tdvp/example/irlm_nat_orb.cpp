@@ -492,7 +492,7 @@ int main(int argc, char **argv)
     double n0=itensor::expectC(psi, sol1b.hamsys.sites, "N",{1}).at(0).real();
     out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<endl;
     arma::uvec inactive=arma::find(cc.diag()<=tolWannier || cc.diag()>=1-tolWannier);
-    for(auto i=0; i<len*10/2; i++) {
+    for(auto i=0; i<len*10; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         itensor::cpu_time t0;
         auto sys2=model2.HamRestricted(rot, nExclude==2, inactive);
