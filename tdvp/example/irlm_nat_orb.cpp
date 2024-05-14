@@ -627,7 +627,7 @@ int main(int argc, char **argv)
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
         out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(psi)<<" "<<sol.energy<<" "<<n0<<endl;
 
-        if (false && i%100==0) {
+        if (i>0 && i%100==0) {
             cc.save("cc_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
             rot.save("orb_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
             //exportPsi(psi,"psi_t"s+to_string(i)+".txt");
