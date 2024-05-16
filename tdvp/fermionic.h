@@ -274,11 +274,11 @@ struct Fermionic {
             size_t pos=0;
             if (1-eval.back()<eval(0)) pos=eval.size()-1;
             arma::vec v=evec.col(pos);
-            if (1-std::abs(v.back())<tolEvec) continue; // already done
+            //if (1-std::abs(v.back())<tolEvec) continue; // already done
             std::vector<GivensRot> gs1;
             for(auto i=0u; i+1<v.size(); i++)
             {
-                if (std::abs(v[i])<tolEvec) continue; // already done
+                //if (std::abs(v[i])<tolEvec) continue; // already done
                 auto b=i+p1;
                 auto g=GivensRot(b).make(v[i],v[i+1]);
                 gs1.push_back(g);

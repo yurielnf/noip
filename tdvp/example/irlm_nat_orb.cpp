@@ -383,12 +383,14 @@ arma::mat InactiveStarRotation(arma::mat const& kin)
 
 
 
-/// ./irlm_nat_orb <len>
+/// ./irlm_nat_orb [len=20] [hamRestricted==0]
 int main(int argc, char **argv)
 {
 //    TestGivens();
     int len=20, nExclude=2;
-    if (argc==2) len=atoi(argv[1]);
+    bool hamRestricted=true;
+    if (argc>=2) len=atoi(argv[1]);
+    if (argc==3) hamRestricted=atoi(argv[2]);
     auto model1=IRLM {.L=len, .t=0.5, .V=0.0, .U=0.25, .ed=-10, .connected=false};
     auto model2=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=0.0};
 
@@ -495,7 +497,9 @@ int main(int argc, char **argv)
     for(auto i=0; i<len*10; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         itensor::cpu_time t0;
-        auto sys2=model2.HamRestricted(rot, nExclude==2, inactive);
+        auto sys2= hamRestricted ?
+                    model2.HamRestricted(rot, nExclude==2, inactive) :
+                    model2.Ham(rot, nExclude==2, inactive);
         cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
         it_tdvp sol {sys2, psi};
@@ -519,7 +523,7 @@ int main(int argc, char **argv)
         for(auto k=0; k<1; k++) {
             //auto rot1=Fermionic::rotNO3(cc,nExclude);
 //            psi=rotateState3(psi, rot1, nExclude).psi;
-            auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,40);
+            auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,10);
 //            auto givens=Fermionic::GivensRotForMatrix(cc,nExcludeGs,20);
             auto rot1=matrot_from_Givens(givens,cc.n_rows);
             //(rot1.t() * cc * rot1).print("rot1.t()*cc*rot1");
