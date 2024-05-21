@@ -383,14 +383,18 @@ arma::mat InactiveStarRotation(arma::mat const& kin)
 
 
 
-/// ./irlm_nat_orb [len=20] [hamRestricted==0]
+/// ./irlm_nat_orb [len=20] [hamRestricted==0] [dt=0.1] [circuit_dt=0.1]
 int main(int argc, char **argv)
 {
+    cout<<"irlm_nat_orb [len=20] [hamRestricted==0] [dt=0.1] [circuit_dt=0.1]"<<endl;
 //    TestGivens();
     int len=20, nExclude=2;
     bool hamRestricted=true;
+    double dt=0.1, circuit_dt=0.1;
     if (argc>=2) len=atoi(argv[1]);
-    if (argc==3) hamRestricted=atoi(argv[2]);
+    if (argc>=3) hamRestricted=atoi(argv[2]);
+    if (argc>=4) dt=atof(argv[3]);
+    if (argc>=5) circuit_dt=atof(argv[4]);
     auto model1=IRLM {.L=len, .t=0.5, .V=0.0, .U=0.25, .ed=-10, .connected=false};
     auto model2=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=0.0};
 
@@ -494,7 +498,7 @@ int main(int argc, char **argv)
     double n0=itensor::expectC(psi, sol1b.hamsys.sites, "N",{1}).at(0).real();
     out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<endl;
     arma::uvec inactive=arma::find(cc.diag()<=tolWannier || cc.diag()>=1-tolWannier);
-    for(auto i=0; i<len*10; i++) {
+    for(auto i=0; i*dt<=len; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         itensor::cpu_time t0;
         auto sys2= hamRestricted ?
@@ -503,12 +507,12 @@ int main(int argc, char **argv)
         cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
         it_tdvp sol {sys2, psi};
-        sol.dt={0,0.1};
+        sol.dt={0,dt};
         sol.bond_dim=512;
         sol.rho_cutoff=1e-14;
-        sol.silent=false;
-        sol.epsilonM=(i%1==0) ? 1e-4 : 0;
-        sol.enrichByFit = (i%10!=0);
+        sol.silent=true;
+        sol.epsilonM=(i%1==0) ? 1e-8 : 0;
+        sol.enrichByFit = false; //(i%10!=0);
 
         sol.iterate();
         cout<<"tdvp time"<<t0.sincemark()<<endl;
@@ -520,7 +524,7 @@ int main(int argc, char **argv)
         cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
         //double n0=arma::cdot(rot.row(0), cc*rot.row(0).st());
-        for(auto k=0; k<1; k++) {
+        if (std::abs(i*dt-std::round(i*dt/circuit_dt)*circuit_dt) < 0.5*dt) {
             //auto rot1=Fermionic::rotNO3(cc,nExclude);
 //            psi=rotateState3(psi, rot1, nExclude).psi;
             auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,10);
@@ -535,6 +539,13 @@ int main(int argc, char **argv)
             //cc.print("cc after rot");
             rot = rot*rot1.t();
             cc=rot1*cc*rot1.t();
+            psi.orthogonalize({"Cutoff",1e-9});
+            inactive=arma::find(cc.diag()<=tolWannier || cc.diag()>=1-tolWannier);
+            cout<<"active: "<<len-inactive.size()<<endl;
+
+            for(auto i=0; i<psi.length(); i++)
+                cout<<itensor::leftLinkIndex(psi,i+1).dim()<<" ";
+            cout<<endl;
         }
 
         if (false) { // another circuit to diagonalize kin in the inactive sector
@@ -627,7 +638,7 @@ int main(int argc, char **argv)
             }
         }
 
-        psi.orthogonalize({"Cutoff",1e-9});
+
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
         out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(psi)<<" "<<sol.energy<<" "<<n0<<endl;
 
@@ -636,14 +647,6 @@ int main(int argc, char **argv)
             rot.save("orb_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
             //exportPsi(psi,"psi_t"s+to_string(i)+".txt");
         }
-
-//        arma::join_horiz(cc.diag(),(rot.t()*K*rot).eval().diag()).print("ni kin.diag()");
-        inactive=arma::find(cc.diag()<=tolWannier || cc.diag()>=1-tolWannier);
-        cout<<"active: "<<len-inactive.size()<<endl;
-
-        for(auto i=0; i<psi.length(); i++)
-            cout<<itensor::leftLinkIndex(psi,i+1).dim()<<" ";
-        cout<<endl;
     }
 
     return 0;
