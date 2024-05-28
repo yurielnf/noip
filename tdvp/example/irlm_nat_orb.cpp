@@ -511,7 +511,7 @@ int main(int argc, char **argv)
         sol.bond_dim=512;
         sol.rho_cutoff=1e-14;
         sol.silent=true;
-        sol.epsilonM=(i%1==0) ? 1e-8 : 0;
+        sol.epsilonM=(i%1==0) ? 1e-7 : 0;
         sol.enrichByFit = false; //(i%10!=0);
 
         sol.iterate();
