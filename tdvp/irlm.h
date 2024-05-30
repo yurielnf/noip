@@ -70,6 +70,7 @@ struct IRLM {
             return Fermionic(K,Umat,rot);
         }();
         HamSys hsys=sys.Ham();
+        hsys.hamEnrich=hsys.ham;
         if (iInactive.empty()) return hsys;
         sys.Kmat.submat(iInactive,iInactive).fill(0);
         hsys.hamEnrich=sys.Ham().ham;
