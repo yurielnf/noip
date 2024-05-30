@@ -476,7 +476,7 @@ int main(int argc, char **argv)
 
     cout<<"\n-------------------------- find again the gs1 in NO1 while keeping the active NO2 ----------------\n";
     if (true) { // circuit1
-        auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,10);
+        auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,40);
         auto rot1=matrot_from_Givens(givens,cc.n_rows);
         rot = rot*rot1.t();
         cc=rot1*cc*rot1.t();
@@ -527,7 +527,7 @@ int main(int argc, char **argv)
         if (std::abs(i*dt-std::round(i*dt/circuit_dt)*circuit_dt) < 0.5*dt) {
             //auto rot1=Fermionic::rotNO3(cc,nExclude);
 //            psi=rotateState3(psi, rot1, nExclude).psi;
-            auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,10);
+            auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,40);
 //            auto givens=Fermionic::GivensRotForMatrix(cc,nExcludeGs,20);
             auto rot1=matrot_from_Givens(givens,cc.n_rows);
             //(rot1.t() * cc * rot1).print("rot1.t()*cc*rot1");
