@@ -47,14 +47,14 @@ struct it_tdvp {
         if (epsilonM != 0)
         {
             // Global subspace expansion
-           std::vector<double> epsilonK(5,1E-8);
+           std::vector<double> epsilonK(3,1E-8);
            //std::vector<int> maxDimK(5,0.5*itensor::maxLinkDim(psi));
 
             if (hamsys.hamEnrich.length()==0) throw std::invalid_argument("hamsys.hamEnrich need to be defined for tdvp");
             itensor::addBasis(psi,hamsys.ham,epsilonK,
                      {"Cutoff",epsilonM,
                       "Method",enrichByFit ? "Fit" : "DensityMatrix",
-                      "KrylovOrd",5,
+                      "KrylovOrd",3,
                       "DoNormalize", do_normalize,
                       "Quiet",true,
                       "Silent",silent});

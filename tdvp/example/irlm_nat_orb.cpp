@@ -496,7 +496,14 @@ int main(int argc, char **argv)
     ofstream out("irlm_no_L"s+to_string(len)+".txt");
     out<<"time M m energy n0\n"<<setprecision(14);
     double n0=itensor::expectC(psi, sol1b.hamsys.sites, "N",{1}).at(0).real();
-    out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<endl;
+    auto cdOp=[&](itensor::Fermion const& sites) {
+        itensor::AutoMPO ampo(sites);
+        ampo += "Cdag",1,"C",2;
+        ampo += "Cdag",2,"C",1;
+        return itensor::toMPO(ampo);
+    };
+    double cd=itensor::innerC(psi, cdOp(sol1b.hamsys.sites), psi).real();
+    out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<" "<<cd<<endl;
     arma::uvec inactive=arma::find(cc.diag()<=tolWannier || cc.diag()>=1-tolWannier);
     for(auto i=0; i*dt<=len; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
@@ -640,7 +647,8 @@ int main(int argc, char **argv)
 
 
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
-        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(psi)<<" "<<sol.energy<<" "<<n0<<endl;
+        cd=itensor::innerC(sol.psi, cdOp(sol.hamsys.sites), sol.psi).real();
+        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(psi)<<" "<<sol.energy<<" "<<n0<<" "<<cd<<endl;
 
         if (i>0 && i%100==0) {
             cc.save("cc_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);

@@ -62,7 +62,7 @@ int main(int argc, char **argv)
     sol.enrichByFit = false;
     ofstream out("irlm_star_L"s+to_string(sol.hamsys.ham.length())+".txt");
     out<<"sweep bond-dim energy n0\n"<<setprecision(14);
-    out<<"0 "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real()<<endl;
+    out<<"0 "<< maxLinkDim(sys2.ham)<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real()<<endl;
     for(auto i=0; i*dt<=len; i++) {
         sol.epsilonM=(i%1==0) ? 1e-7 : 0;
         sol.iterate();
