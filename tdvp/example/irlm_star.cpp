@@ -62,7 +62,15 @@ int main(int argc, char **argv)
     sol.enrichByFit = false;
     ofstream out("irlm_star_L"s+to_string(sol.hamsys.ham.length())+".txt");
     out<<"sweep bond-dim energy n0\n"<<setprecision(14);
-    out<<"0 "<< maxLinkDim(sys2.ham)<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real()<<endl;
+    double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
+    auto cdOp=[&](itensor::Fermion const& sites) {
+        itensor::AutoMPO ampo(sites);
+        ampo += "Cdag",1,"C",2;
+        ampo += "Cdag",2,"C",1;
+        return itensor::toMPO(ampo);
+    };
+    double cd=itensor::innerC(sol.psi, cdOp(sol.hamsys.sites), sol.psi).real();
+    out<<"0 "<< maxLinkDim(sys2.ham)<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<" "<<cd<<endl;
     for(auto i=0; i*dt<=len; i++) {
         sol.epsilonM=(i%1==0) ? 1e-7 : 0;
         sol.iterate();
@@ -73,7 +81,8 @@ int main(int argc, char **argv)
         }
 
         double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
-        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham)<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<endl;
+        cd=itensor::innerC(sol.psi, cdOp(sol.hamsys.sites), sol.psi).real();
+        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham)<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<" "<<cd<<endl;
     }
 
     return 0;
