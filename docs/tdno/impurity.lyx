@@ -100,17 +100,26 @@ One step of time evolution, up to second order in
 
 \end_inset
 
+For the next time step, we change the orbitals (using the circuit) and the
+ 
+\begin_inset Quotes eld
+\end_inset
 
+2
+\begin_inset Quotes erd
+\end_inset
+
+ orbitals also.
+ We need to compute:
 \end_layout
 
 \begin_layout Standard
-Two steps of time evolution
 \begin_inset Formula 
 \begin{equation}
-\begin{alignedat}{1}e^{h}e^{h} & =e^{h_{2}}e^{h_{12}^{(1)}}e^{h_{2}}e^{h_{12}^{(1)}}\\
- & =e^{2h_{2}}e^{-h_{2}}e^{h_{12}^{(1)}}e^{h_{2}}e^{h_{12}^{(1)}}\\
- & =e^{2h_{2}}e^{h_{12}^{(1)}+\frac{2}{2}[h_{12},h_{2}]}e^{h_{12}^{(1)}}\\
- & =e^{2h_{2}}e^{h_{12}^{(2)}}e^{h_{12}^{(1)}}
+\begin{alignedat}{1}e^{h}e^{h_{2}^{(1)}} & =e^{h_{12}+h_{2}}e^{h_{2}^{(1)}}\\
+ & =e^{h_{12}+h_{2}+h_{2}^{(1)}+[h_{12}+h_{2},h_{2}^{(1)}]/2}\\
+ & =e^{h_{2}^{(2)}}e^{-h_{2}^{(2)}}e^{h_{12}+h_{2}^{(2)}+[h_{12}+h_{2}^{(2)},h_{2}^{(1)}]/2}\\
+ & =e^{h_{2}^{(2)}}e^{h_{12}+[h_{12}+h_{2}^{(2)},h_{2}^{(1)}]/2+[h_{12},h_{2}^{(2)}]/2}
 \end{alignedat}
 \end{equation}
 
@@ -123,7 +132,7 @@ After
  time steps
 \begin_inset Formula 
 \begin{equation}
-\begin{alignedat}{1}e^{h}e^{h}...e^{h} & =e^{Th}e^{h_{12}^{(T)}h_{12}^{(T-1)}h_{12}^{(1)}}\end{alignedat}
+\begin{alignedat}{1}e^{h}e^{h}...e^{h} & =e^{Th}e^{h_{12}^{(T)}}e^{h_{12}^{(T-1)}}...e^{h_{12}^{(1)}}\end{alignedat}
 \end{equation}
 
 \end_inset
