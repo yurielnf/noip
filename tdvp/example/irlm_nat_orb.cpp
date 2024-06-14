@@ -383,10 +383,10 @@ arma::mat InactiveStarRotation(arma::mat const& kin)
 
 
 
-/// ./irlm_nat_orb [len=20] [hamRestricted==0] [dt=0.1] [circuit_dt=0.1]
+/// ./irlm_nat_orb [len=20] [hamRestricted=1] [dt=0.1] [circuit_dt=0.1]
 int main(int argc, char **argv)
 {
-    cout<<"irlm_nat_orb [len=20] [hamRestricted==0] [dt=0.1] [circuit_dt=0.1]"<<endl;
+    cout<<"irlm_nat_orb [len=20] [hamRestricted=1] [dt=0.1] [circuit_dt=0.1]"<<endl;
 //    TestGivens();
     int len=20, nExclude=2;
     bool hamRestricted=true;
@@ -509,10 +509,9 @@ int main(int argc, char **argv)
     for(auto i=0; i*dt<=len; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         itensor::cpu_time t0;
-        // auto sys2= hamRestricted ?
-        //             model2.HamRestricted(rot, nExclude==2, inactive) :
-        //             model2.Ham(rot, nExclude==2, inactive);
-        auto sys2 = model2_ip.Ham(rot,len-inactive.size(),dt);
+        auto sys2 = hamRestricted ?
+                    model2_ip.HamIP(rot,len-inactive.size(),dt) :
+                    model2_ip.Ham(rot) ;
         cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
         it_tdvp sol {sys2, psi};
