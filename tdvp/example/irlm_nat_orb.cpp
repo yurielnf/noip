@@ -505,12 +505,14 @@ int main(int argc, char **argv)
     double cd=itensor::innerC(psi, cdOp(sol1b.hamsys.sites), psi).real();
     out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<" "<<cd<<endl;
     arma::uvec inactive=arma::find(cc.diag()<=tolWannier || cc.diag()>=1-tolWannier);
+    auto model2_ip=IRLM_ip{model2};
     for(auto i=0; i*dt<=len; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         itensor::cpu_time t0;
-        auto sys2= hamRestricted ?
-                    model2.HamRestricted(rot, nExclude==2, inactive) :
-                    model2.Ham(rot, nExclude==2, inactive);
+        // auto sys2= hamRestricted ?
+        //             model2.HamRestricted(rot, nExclude==2, inactive) :
+        //             model2.Ham(rot, nExclude==2, inactive);
+        auto sys2 = model2_ip.Ham(rot,len-inactive.size(),dt);
         cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
         it_tdvp sol {sys2, psi};

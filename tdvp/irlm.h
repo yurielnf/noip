@@ -99,5 +99,45 @@ struct IRLM {
 
 };
 
+struct IRLM_ip {
+    itensor::Fermion sites;
+    itensor::AutoMPO hImp;
+    arma::mat K;
+
+    IRLM_ip(const IRLM& irlm)
+        : sites(irlm.L, {"ConserveNf=",true})
+        , hImp (sites)
+    {
+        arma::mat Umat;
+        std::tie(K,Umat)=irlm.matrices();
+
+        std::vector<int> impPos={0,1};
+        for(auto i:impPos)
+            for(auto j:impPos)
+                if (std::abs(Umat(i,j))>1e-15)
+                    hImp += Umat(i,j),"N", i+1,"N", j+1;
+    }
+
+    HamSys Ham(arma::mat const& rot, int nExclude, double dt) const
+    {
+        arma::mat KRe=rot.t()*K*rot;
+        arma::cx_mat Kim = KRe.submat(0, nExclude, nExclude-1, rot.n_rows-1) *
+                           KRe.submat(nExclude,nExclude,rot.n_rows-1, rot.n_rows-1) * arma::cx_double(0,-0.5*dt);
+        arma::cx_mat Kip=KRe*arma::cx_double(1,0);
+        Kip.submat(nExclude, nExclude, rot.n_rows-1, rot.n_rows-1).fill(0.0);
+        Kip.submat(0,0,nExclude-1,nExclude-1)=KRe.submat(0,0,nExclude-1,nExclude-1)* arma::cx_double(1,0);
+        Kip.submat(0, nExclude, nExclude-1, rot.n_rows-1)+=Kim;
+        Kip.submat(nExclude, 0, rot.n_rows-1, nExclude-1)+=Kim.t();
+
+        auto h=hImp;
+        for(auto i=0; i<nExclude; i++)
+            for(auto j=0; j<sites.length(); j++)
+            if (std::abs(Kip(i,j))>1e-15)
+                h += Kip(i,j),"Cdag",i+1,"C",j+1;
+        auto mpo=itensor::toMPO(h);
+        return {sites,mpo,mpo};
+    }
+};
+
 
 #endif // IRLM_H
