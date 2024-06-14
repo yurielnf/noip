@@ -101,7 +101,7 @@ One step of time evolution, up to second order in
 \end_inset
 
 For the next time step, we change the orbitals (using the circuit) and the
- 
+ definition of 
 \begin_inset Quotes eld
 \end_inset
 
@@ -109,7 +109,7 @@ For the next time step, we change the orbitals (using the circuit) and the
 \begin_inset Quotes erd
 \end_inset
 
- orbitals also.
+ also.
  We need to compute:
 \end_layout
 
@@ -154,6 +154,26 @@ with
 \end_inset
 
 .
+\end_layout
+
+\begin_layout Subsection
+Hybridization in the interaction picture
+\end_layout
+
+\begin_layout Standard
+We need this commutator:
+\begin_inset Formula 
+\begin{equation}
+\begin{alignedat}{1}[H_{12},H_{2}] & =t_{\alpha i}t_{jk}\left\{ [c_{\alpha}^{\dagger}c_{i},c_{j}^{\dagger}c_{k}]+[c_{i}^{\dagger}c_{\alpha},c_{j}^{\dagger}c_{k}]\right\} \\
+ & =t_{\alpha i}t_{jk}\left\{ c_{\alpha}^{\dagger}c_{k}\delta_{ij}-c_{j}^{\dagger}c_{\alpha}\delta_{ik}\right\} \\
+ & =t_{\alpha i}t_{ik}c_{\alpha}^{\dagger}c_{k}-t_{\alpha i}t_{ji}c_{j}^{\dagger}c_{\alpha}\\
+ & =t_{\alpha i}t_{ij}\left\{ c_{\alpha}^{\dagger}c_{j}-c_{j}^{\dagger}c_{\alpha}\right\} 
+\end{alignedat}
+\end{equation}
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Section*
