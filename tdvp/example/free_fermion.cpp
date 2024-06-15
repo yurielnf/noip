@@ -32,7 +32,7 @@ int main(int argc, char **argv)
     eig_sym(eval1,evec1,H1);
 
     auto corr=[&](int i, int j, double t) {
-        cx_mat phase=diagmat(arma::exp(eval1*cx_double(0,t)));
+        cx_mat phase=diagmat(arma::exp(eval1*cx_double(0,-t)));
         cx_rowvec jket=evec1.row(j)*phase*evec1.t()*evec0;
         cx_rowvec iket=evec1.row(i)*phase*evec1.t()*evec0;
         cx_double sum=0;
