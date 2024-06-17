@@ -130,16 +130,16 @@ struct IRLM_ip {
         return {sites,mpo,mpo};
     }
 
-    HamSys HamIP(arma::mat const& rot, int nExclude, double dt) const
+    HamSys HamIP(arma::mat const& rot, int nImp, double dt) const
     {
         arma::mat KRe=rot.t()*K*rot;
-        arma::cx_mat Kim = KRe.submat(0, nExclude, nExclude-1, rot.n_rows-1) *
-                           KRe.submat(nExclude,nExclude,rot.n_rows-1, rot.n_rows-1) * arma::cx_double(0,-0.5*dt);
+        arma::cx_mat Kim = KRe.submat(0, nImp, nImp-1, rot.n_rows-1) *
+                           KRe.submat(nImp,nImp,rot.n_rows-1, rot.n_rows-1) * arma::cx_double(0,0.5*dt);
         arma::cx_mat Kip=KRe * arma::cx_double(1,0);
-        Kip.submat(nExclude, nExclude, rot.n_rows-1, rot.n_rows-1).fill(0.0);
-        Kip.submat(0,0,nExclude-1,nExclude-1)=KRe.submat(0,0,nExclude-1,nExclude-1) * arma::cx_double(1,0);
-        Kip.submat(0, nExclude, nExclude-1, rot.n_rows-1)+=Kim;
-        Kip.submat(nExclude, 0, rot.n_rows-1, nExclude-1)+=Kim.t();
+        Kip.submat(nImp, nImp, rot.n_rows-1, rot.n_rows-1).fill(0.0);
+        Kip.submat(0,0,nImp-1,nImp-1)=KRe.submat(0,0,nImp-1,nImp-1) * arma::cx_double(1,0);
+        Kip.submat(0, nImp, nImp-1, rot.n_rows-1)+=Kim;
+        Kip.submat(nImp, 0, rot.n_rows-1, nImp-1)+=Kim.t();
 
         auto h=hImp;
         for(auto i=0; i<sites.length(); i++)
