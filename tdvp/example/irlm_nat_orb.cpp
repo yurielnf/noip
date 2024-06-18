@@ -506,6 +506,7 @@ int main(int argc, char **argv)
     out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<" "<<cd<<endl;
     arma::uvec inactive=arma::find(cc.diag()<=tolWannier || cc.diag()>=1-tolWannier);
     auto model2_ip=IRLM_ip{model2};
+    arma::cx_mat rotg=rot*arma::cx_double(1.0);
     for(auto i=0; i*dt<=len; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         itensor::cpu_time t0;
@@ -545,10 +546,11 @@ int main(int argc, char **argv)
             t0.mark();
             //cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
             //cc.print("cc after rot");
-            rot = rot*rot1.t();
+            rotg = rotg*rot1.t();
             cc=rot1*cc*rot1.t();
             psi.orthogonalize({"Cutoff",1e-9});
             inactive=arma::find(cc.diag()<=tolWannier || cc.diag()>=1-tolWannier);
+
             cout<<"active: "<<len-inactive.size()<<endl;
 
             for(auto i=0; i<psi.length(); i++)

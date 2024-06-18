@@ -149,6 +149,16 @@ struct IRLM_ip {
         auto mpo=itensor::toMPO(h);
         return {sites,mpo,mpo};
     }
+
+    /// return exp(-i H2 dt), i.e. the rotation generated after the interaction picture evolution
+    arma::cx_mat rotIP(arma::cx_mat const& rot, int nImp, double dt)
+    {
+        using namespace arma;
+        arma::cx_mat Kin=rot.t()*K*rot;
+        arma::cx_mat rotK(size(rot), fill::eye);
+        rotK.submat(nImp,nImp, rot.n_rows-1,rot.n_rows-1)=expmat(Kin.submat(nImp,nImp, rot.n_rows-1,rot.n_rows-1) * cx_double(0,-dt));
+        return rot*rotK;
+    }
 };
 
 
