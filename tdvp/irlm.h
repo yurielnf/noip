@@ -100,12 +100,14 @@ struct IRLM {
 };
 
 struct IRLM_ip {
+    IRLM irlm;
     itensor::Fermion sites;
     itensor::AutoMPO hImp;
     arma::mat K;
 
-    IRLM_ip(const IRLM& irlm)
-        : sites(irlm.L, {"ConserveNf=",true})
+    explicit IRLM_ip(const IRLM& irlm_)
+        : irlm(irlm_)
+        , sites(irlm_.L, {"ConserveNf=",true})
         , hImp (sites)
     {
         arma::mat Umat;
@@ -130,16 +132,28 @@ struct IRLM_ip {
         return {sites,mpo,mpo};
     }
 
-    HamSys HamIP(arma::mat const& rot, int nImp, double dt) const
+    HamSys Ham(arma::cx_mat const& rot) const
     {
-        arma::mat KRe=rot.t()*K*rot;
-        arma::cx_mat Kim = KRe.submat(0, nImp, nImp-1, rot.n_rows-1) *
-                           KRe.submat(nImp,nImp,rot.n_rows-1, rot.n_rows-1) * arma::cx_double(0,0.5*dt);
-        arma::cx_mat Kip=KRe * arma::cx_double(1,0);
+        arma::cx_mat Kin=rot.t()*K*rot;
+        auto h=hImp;
+        for(auto i=0; i<sites.length(); i++)
+            for(auto j=0; j<sites.length(); j++)
+            if (std::abs(Kin(i,j))>1e-15)
+                h += Kin(i,j),"Cdag",i+1,"C",j+1;
+        auto mpo=itensor::toMPO(h);
+        return {sites,mpo,mpo};
+    }
+
+    HamSys HamIP(arma::cx_mat const& rot, int nImp, double dt) const
+    {
+        arma::cx_mat K0=rot.t()*K*rot;
+        arma::cx_mat K1 = K0.submat(0, nImp, nImp-1, rot.n_rows-1) *
+                           K0.submat(nImp,nImp,rot.n_rows-1, rot.n_rows-1) * arma::cx_double(0,0.5*dt);
+        arma::cx_mat Kip=K0 * arma::cx_double(1,0);
         Kip.submat(nImp, nImp, rot.n_rows-1, rot.n_rows-1).fill(0.0);
-        Kip.submat(0,0,nImp-1,nImp-1)=KRe.submat(0,0,nImp-1,nImp-1) * arma::cx_double(1,0);
-        Kip.submat(0, nImp, nImp-1, rot.n_rows-1)+=Kim;
-        Kip.submat(nImp, 0, rot.n_rows-1, nImp-1)+=Kim.t();
+        Kip.submat(0,0,nImp-1,nImp-1)=K0.submat(0,0,nImp-1,nImp-1) * arma::cx_double(1,0);
+        Kip.submat(0, nImp, nImp-1, rot.n_rows-1)+=K1;
+        Kip.submat(nImp, 0, rot.n_rows-1, nImp-1)+=K1.t();
 
         auto h=hImp;
         for(auto i=0; i<sites.length(); i++)
@@ -157,7 +171,7 @@ struct IRLM_ip {
         arma::cx_mat Kin=rot.t()*K*rot;
         arma::cx_mat rotK(size(rot), fill::eye);
         rotK.submat(nImp,nImp, rot.n_rows-1,rot.n_rows-1)=expmat(Kin.submat(nImp,nImp, rot.n_rows-1,rot.n_rows-1) * cx_double(0,-dt));
-        return rot*rotK;
+        return rotK;
     }
 };
 

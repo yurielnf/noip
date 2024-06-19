@@ -40,30 +40,33 @@ auto eig_unitary(const arma::mat& A, int nExclude=2)
     return make_pair(lambda,rot);
 }
 
+template<class T=double>
 struct GivensRot {
     size_t b;     ///< bond b --- b+1
-    double c, s, r;  ///< cos and sin and radius
+    T c, s, r;  ///< cos and sin and radius
 
     GivensRot(size_t b_) : b(b_) {}
 
     /// to eliminate p from (p,q). Adapted from eigen.tuxfamily.org
-    GivensRot& make(double p, double q)
+    static GivensRot<double> createFromPair(size_t b, double p,  double q)
     {
         using Scalar=double;
         using std::sqrt;
         using std::abs;
+
+        GivensRot<double> g(b);
         std::swap(p,q); // to eliminate the p instead of q.
         if(q==Scalar(0))
         {
-            c = p<Scalar(0) ? Scalar(-1) : Scalar(1);
-            s = Scalar(0);
-            r = abs(p);
+            g.c = p<Scalar(0) ? Scalar(-1) : Scalar(1);
+            g.s = Scalar(0);
+            g.r = abs(p);
         }
         else if(p==Scalar(0))
         {
-            c = Scalar(0);
-            s = q<Scalar(0) ? Scalar(1) : Scalar(-1);
-            r = abs(q);
+            g.c = Scalar(0);
+            g.s = q<Scalar(0) ? Scalar(1) : Scalar(-1);
+            g.r = abs(q);
         }
         else if(abs(p) > abs(q))
         {
@@ -71,9 +74,9 @@ struct GivensRot {
             Scalar u = sqrt(Scalar(1) + t*t);
             if(p<Scalar(0))
                 u = -u;
-            c = Scalar(1)/u;
-            s = -t * c;
-            r = p * u;
+            g.c = Scalar(1)/u;
+            g.s = -t * g.c;
+            g.r = p * u;
         }
         else
         {
@@ -81,30 +84,93 @@ struct GivensRot {
             Scalar u = sqrt(Scalar(1) + t*t);
             if(q<Scalar(0))
                 u = -u;
-            s = -Scalar(1)/u;
-            c = -t * s;
-            r = q * u;
+            g.s = -Scalar(1)/u;
+            g.c = -t * g.s;
+            g.r = q * u;
         }
-        return *this;
+        return g;
+    }
+
+    static GivensRot<std::complex<double>> createFromPair(size_t b, std::complex<double> p, std::complex<double> q)
+    {
+        using Scalar=T;
+        using RealScalar=double;
+        using std::sqrt;
+        using std::abs;
+        using std::conj;
+
+        GivensRot<T> g(b);
+        std::swap(p,q); // to eliminate the p instead of q.
+        if(q==Scalar(0))
+        {
+            g.c = std::real(p)<0 ? Scalar(-1) : Scalar(1);
+            g.s = 0;
+            g.r = g.c * p;
+        }
+        else if(p==Scalar(0))
+        {
+            g.c = 0;
+            g.s = -q/abs(q);
+            g.r = abs(q);
+        }
+        else
+        {
+            RealScalar p1 = std::abs(p);
+            RealScalar q1 = std::abs(q);
+            if(p1>=q1)
+            {
+                Scalar ps = p / p1;
+                RealScalar p2 = std::norm(ps);
+                Scalar qs = q / p1;
+                RealScalar q2 = std::norm(qs);
+
+                RealScalar u = sqrt(RealScalar(1) + q2/p2);
+                if(std::real(p)<RealScalar(0))
+                    u = -u;
+
+                g.c = Scalar(1)/u;
+                g.s = -qs*conj(ps)*(g.c/p2);
+                g.r = p * u;
+            }
+            else
+            {
+                Scalar ps = p / q1;
+                RealScalar p2 = std::norm(ps);
+                Scalar qs = q / q1;
+                RealScalar q2 = std::norm(qs);
+
+                RealScalar u = q1 * sqrt(p2 + q2);
+                if(std::real(p)<RealScalar(0))
+                    u = -u;
+
+                p1 = abs(p);
+                ps = p/p1;
+                g.c = p1/u;
+                g.s = -conj(ps) * (q/u);
+                g.r = ps * u;
+            }
+        }
+        return g;
     }
 
     double angle() const { return atan2(s,c); }
 
-    arma::mat22 matrix() const { return {{c,s},{-s,c}}; }
+    typename arma::Mat<T>::template fixed<2,2> matrix() const { return {{c,s},{-s,c}}; }
 
     void transposeInPlace() {s=-s;}
 };
 
-arma::mat matrot_from_Givens(std::vector<GivensRot> const& gates, size_t n=0)
+template<class T>
+arma::Mat<T> matrot_from_Givens(std::vector<GivensRot<T>> const& gates, size_t n=0)
 {
     if (n==0) {
-        for(const GivensRot& g : gates) if (g.b>n) n=g.b;
+        for(const GivensRot<T>& g : gates) if (g.b>n) n=g.b;
         n+=2;
     }
-    arma::mat rot(n,n, arma::fill::eye);
+    arma::Mat<T> rot(n,n, arma::fill::eye);
     for(int i=gates.size()-1; i>=0; i--) { // apply to the right in reverse
 //    for(auto i=0u; i<gates.size(); i++) {
-        const GivensRot& g=gates[i];
+        const GivensRot<T>& g=gates[i];
         rot.submat(0,g.b,n-1,g.b+1) = rot.submat(0,g.b,n-1,g.b+1) * g.matrix();
     }
     return rot;
@@ -180,7 +246,7 @@ struct Fermionic {
         if (Umat.empty() && Vijkl.empty()) return;
         if (!Rot.empty()) return InteractionRot(h);
         // Uij ni nj
-        for(int i=0;i<Umat.n_rows; i++)
+        for(int i=0u;i<Umat.n_rows; i++)
             for(int j=0;j<Umat.n_cols; j++)
                 if (fabs(Umat(i,j))>1e-15)
                     h += Umat(i,j),"Cdag",i+1,"C",i+1,"Cdag",j+1,"C",j+1;
@@ -247,40 +313,40 @@ struct Fermionic {
         return {sites, hk};
     }
 
-    static arma::mat cc_matrix(itensor::MPS const& gs, itensor::Fermion const& sites)
+    static arma::cx_mat cc_matrix(itensor::MPS const& gs, itensor::Fermion const& sites)
     {
         auto ccz=correlationMatrixC(gs, sites,"Cdag","C");
-        arma::mat cc(ccz.size(), ccz.size());
+        arma::cx_mat cc(ccz.size(), ccz.size());
         for(auto i=0u; i<ccz.size(); i++)
             for(auto j=0u; j<ccz[i].size(); j++)
-                cc(i,j)=std::real(ccz[i][j]);
+                cc(i,j)=ccz[i][j];
         return cc;
     }
 
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
-    static std::vector<GivensRot> NOGivensRot(arma::mat const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10)
+    static std::vector<GivensRot<arma::cx_double>> NOGivensRot(arma::cx_mat const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10)
     {
         using namespace arma;
-        arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
-        std::vector<GivensRot> gs;
-        arma::mat evec;
+        arma::cx_mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
+        std::vector<GivensRot<cx_double>> gs;
+        arma::cx_mat evec;
         arma::vec eval;
         size_t d=blockSize;
         for(auto p2=cc1.n_rows-1; p2>0u; p2--) {
             size_t p1= (p2+1>d) ? p2+1-d : 0u ;
-            arma::mat cc2=cc1.submat(p1,p1,p2,p2);
+            arma::cx_mat cc2=cc1.submat(p1,p1,p2,p2);
             arma::eig_sym(eval,evec,cc2);
             // select the less active
             size_t pos=0;
             if (1-eval.back()<eval(0)) pos=eval.size()-1;
-            arma::vec v=evec.col(pos);
+            arma::cx_vec v=evec.col(pos);
             if (1-std::abs(v.back())<tolEvec) continue; // already done
-            std::vector<GivensRot> gs1;
+            std::vector<GivensRot<cx_double>> gs1;
             for(auto i=0u; i+1<v.size(); i++)
             {
                 //if (std::abs(v[i])<tolEvec) continue; // already done
                 auto b=i+p1;
-                auto g=GivensRot(b).make(v[i],v[i+1]);
+                auto g=GivensRot<cx_double>::createFromPair(b,v[i],v[i+1]);
                 gs1.push_back(g);
                 v[i+1]=g.r;
             }
@@ -303,11 +369,11 @@ struct Fermionic {
     }
 
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
-    static std::vector<GivensRot> GivensRotForMatrix(arma::mat const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10)
+    static std::vector<GivensRot<>> GivensRotForMatrix(arma::mat const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10)
     {
         using namespace arma;
         arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
-        std::vector<GivensRot> gs;
+        std::vector<GivensRot<>> gs;
         arma::mat evec;
         arma::vec eval;
         auto evalRef=conv_to<std::vector<double>>::from( eig_sym(cc1) );
@@ -321,11 +387,11 @@ struct Fermionic {
             evalRef.erase(evalRef.begin()+j0);
             arma::vec v=evec.col(i0);
             if (1-std::abs(v.back())<tolEvec) continue; // already done
-            std::vector<GivensRot> gs1;
+            std::vector<GivensRot<>> gs1;
             for(auto i=0u; i+1<v.size(); i++)
             {
                 auto b=i+p1;
-                auto g=GivensRot(b).make(v[i],v[i+1]);
+                auto g=GivensRot<>::createFromPair(b,v[i],v[i+1]);
                 gs1.push_back(g);
                 v[i+1]=g.r;
             }
@@ -337,16 +403,16 @@ struct Fermionic {
     }
 
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
-    static std::vector<GivensRot> GivensRotForRot(arma::mat rot)
+    static std::vector<GivensRot<>> GivensRotForRot(arma::mat rot)
     {
         using namespace arma;
-        std::vector<GivensRot> givens;
+        std::vector<GivensRot<>> givens;
         for(auto p2=rot.n_cols-1; p2>0u; p2--) {
             arma::vec v=rot.col(p2);
-            std::vector<GivensRot> gs1;
+            std::vector<GivensRot<>> gs1;
             for(auto i=0u; i+1<=p2; i++)
             {
-                auto g=GivensRot(i).make(v[i],v[i+1]);
+                auto g=GivensRot<>::createFromPair(i,v[i],v[i+1]);
                 gs1.push_back(g);
                 v[i+1]=g.r;
             }
@@ -359,12 +425,12 @@ struct Fermionic {
     }
 
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
-    static std::vector<itensor::BondGate> NOGates(itensor::Fermion const& sites, std::vector<GivensRot> const& gs)
+    static std::vector<itensor::BondGate> NOGates(itensor::Fermion const& sites, std::vector<GivensRot<>> const& gs)
     {
         using itensor::BondGate;
         using itensor::Cplx_i;
         std::vector<itensor::BondGate> gates;
-        for(const GivensRot& g : gs)
+        for(const GivensRot<>& g : gs)
         {
             int b=g.b+1;
             auto hterm = ( sites.op("Adag",b)*sites.op("A",b+1)

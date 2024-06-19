@@ -59,7 +59,7 @@ int main()
     }
     for(auto i=0; i<sol_gs.psi.length(); i++)
         cout<<itensor::leftLinkIndex(sol_gs.psi,i+1).dim()<<" ";
-    auto cc1=Fermionic::cc_matrix(sol_gs.psi, sol_gs.hamsys.sites);
+    auto cc1=arma::real( Fermionic::cc_matrix(sol_gs.psi, sol_gs.hamsys.sites) );
 
     cout<<"\n-------------------------- rotate the psi to natural orbitals ----------------\n";
 
@@ -85,7 +85,7 @@ int main()
             sol.iterate();
             out<<(i+1)*abs(sol.dt)<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<endl;
         }
-        auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
+        arma::mat cc=arma::real(Fermionic::cc_matrix(sol.psi, sol.hamsys.sites));
         cc.diag().print("ni");
         rot=Fermionic::rotNO(cc);//model.rotStar();//
         psi=sol.psi;
