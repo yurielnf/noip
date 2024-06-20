@@ -7,6 +7,16 @@
 
 using cmpx=std::complex<double>;
 
+/// compute the exp(-i H) assuming H is Hermitian
+template<class T>
+arma::cx_mat expIH(arma::Mat<T> const& H)
+{
+    arma::Mat<T> evec;
+    arma::vec eval;
+    arma::eig_sym(eval,evec,H);
+    return evec * arma::diagmat(arma::exp(eval*cmpx(0,-1))) * evec.t();
+}
+
 
 template<class T>
 std::pair<arma::cx_vec,arma::cx_mat> eig_unitary(const arma::Mat<T>& A)

@@ -154,29 +154,30 @@ struct Fermionic {
     }
 
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
-    static std::vector<GivensRot<arma::cx_double>> NOGivensRot(arma::cx_mat const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10)
+    template<class T>
+    static std::vector<GivensRot<T>> NOGivensRot(arma::Mat<T> const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10)
     {
         using namespace arma;
-        arma::cx_mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
-        std::vector<GivensRot<cx_double>> gs;
-        arma::cx_mat evec;
+        arma::Mat<T> cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
+        std::vector<GivensRot<T>> gs;
+        arma::Mat<T> evec;
         arma::vec eval;
         size_t d=blockSize;
         for(auto p2=cc1.n_rows-1; p2>0u; p2--) {
             size_t p1= (p2+1>d) ? p2+1-d : 0u ;
-            arma::cx_mat cc2=cc1.submat(p1,p1,p2,p2);
+            arma::Mat<T> cc2=cc1.submat(p1,p1,p2,p2);
             arma::eig_sym(eval,evec,cc2);
             // select the less active
             size_t pos=0;
             if (1-eval.back()<eval(0)) pos=eval.size()-1;
-            arma::cx_vec v=evec.col(pos);
+            arma::Col<T> v=evec.col(pos);
             if (1-std::abs(v.back())<tolEvec) continue; // already done
-            std::vector<GivensRot<cx_double>> gs1;
+            std::vector<GivensRot<T>> gs1;
             for(auto i=0u; i+1<v.size(); i++)
             {
                 //if (std::abs(v[i])<tolEvec) continue; // already done
                 auto b=i+p1;
-                auto g=GivensRot<cx_double>::createFromPair(b,v[i],v[i+1]);
+                auto g=GivensRot<T>::createFromPair(b,v[i],v[i+1]);
                 gs1.push_back(g);
                 v[i+1]=g.r;
             }
@@ -266,11 +267,13 @@ struct Fermionic {
             int b=g.b+1;
             auto Kin=g.ilogMatrix();
             // auto hterm = ( sites.op("Adag",b)*sites.op("A",b+1)
-            //               -sites.op("Adag",b+1)*sites.op("A",b))* (g.angle()*Cplx_i);
+            //               -sites.op("A",b+1)*sites.op("A",b))* (g.angle()*Cplx_i);
             itensor::ITensor hterm;
-            for(auto i:{0,1})
-                for(auto j:{0,1})
-                    hterm += sites.op("Adag",b+i)*sites.op("A",b+j) * Kin(i,j);
+            hterm += sites.op("Adag",b)*sites.op("A",b+1) * Kin(0,1);
+            hterm += sites.op("A",b)*sites.op("Adag",b+1) * Kin(1,0);
+            hterm += sites.op("N",b)*sites.op("Id",b+1) * Kin(0,0);
+            hterm += sites.op("Id",b)*sites.op("N",b+1) * Kin(1,1);
+
             auto bg=BondGate(sites,b,b+1,BondGate::tReal,1,hterm);
             gates.push_back(bg);
         }

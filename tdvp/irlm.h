@@ -144,9 +144,11 @@ struct IRLM_ip {
         return {sites,mpo,mpo};
     }
 
-    HamSys HamIP(arma::cx_mat const& rot, int nImp, double dt) const
+    template<class T>
+    HamSys HamIP(arma::Mat<T> const& rot, int nImp, double dt) const
     {
-        arma::cx_mat K0=rot.t()*K*rot;
+        if (nImp==rot.n_rows) return Ham(rot);
+        arma::Mat<T> K0=rot.t()*K*rot;
         arma::cx_mat K1 = K0.submat(0, nImp, nImp-1, rot.n_rows-1) *
                            K0.submat(nImp,nImp,rot.n_rows-1, rot.n_rows-1) * arma::cx_double(0,0.5*dt);
         arma::cx_mat Kip=K0 * arma::cx_double(1,0);
@@ -165,12 +167,13 @@ struct IRLM_ip {
     }
 
     /// return exp(-i H2 dt), i.e. the rotation generated after the interaction picture evolution
-    arma::cx_mat rotIP(arma::cx_mat const& rot, int nImp, double dt)
+    template<class T>
+    arma::cx_mat rotIP(arma::Mat<T> const& rot, int nImp, double dt)
     {
         using namespace arma;
-        arma::cx_mat Kin=rot.t()*K*rot;
+        arma::Mat<T> Kin=rot.t()*K*rot;
         arma::cx_mat rotK(size(rot), fill::eye);
-        rotK.submat(nImp,nImp, rot.n_rows-1,rot.n_rows-1)=expmat(Kin.submat(nImp,nImp, rot.n_rows-1,rot.n_rows-1) * cx_double(0,-dt));
+        rotK.submat(nImp,nImp, rot.n_rows-1,rot.n_rows-1)=expIH(Kin.submat(nImp,nImp, rot.n_rows-1,rot.n_rows-1) * dt);
         return rotK;
     }
 };
