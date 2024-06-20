@@ -1,182 +1,12 @@
 #ifndef FERMIONIC_H
 #define FERMIONIC_H
 
+#include "givens_rotation.h"
+
 #include<armadillo>
 #include <map>
 #include <array>
 #include <itensor/all.h>
-
-auto eig_unitary(const arma::mat& A, int nExclude=2)
-{
-    using namespace arma;
-    arma::mat A1=A.submat(nExclude,nExclude,A.n_rows-1,A.n_cols-1);
-    cx_vec eval, eval2;
-    cx_mat evec, Q, R;
-    eig_gen(eval, evec, A1);
-    qr(Q, R, evec);
-    cx_mat RDR=R*diagmat(eval)*R.i();
-    eval2=RDR.diag();
-
-//    // fix the sign
-//    for(auto j=0u; j<Q.n_cols; j++) {
-//        auto i=arma::index_max(arma::abs(Q.col(j)));
-//        Q.col(j) /= arma::sign(Q(i,j));
-//    }
-
-#ifndef NDEBUG
-    double err=norm(A-Q*diagmat(eval2)*Q.t());
-    std::cout<<"error diag RDR="<<norm(RDR-diagmat(eval))<<std::endl;
-    std::cout<<"err eig_unitary="<<err<<std::endl;
-    std::cout<<"err |eval|-1="<<norm(arma::abs(eval2)-ones(A.n_cols))<<std::endl;
-#endif
-    arma::mat J=arma::diagmat(arma::regspace(0,eval2.size()-1));
-    arma::cx_mat X=Q.t() * J * Q;
-    arma::vec Xeval=arma::real(X.diag());
-    uvec Xiev=arma::stable_sort_index(Xeval);
-    cx_vec lambda(A.n_rows, fill::ones);
-    arma::cx_mat rot(A.n_rows,A.n_cols,fill::eye);
-    rot.submat(nExclude,nExclude,A.n_rows-1,A.n_cols-1)=Q.cols(Xiev);
-    lambda.rows(nExclude,A.n_rows-1)=eval2(Xiev);
-    return make_pair(lambda,rot);
-}
-
-template<class T=double>
-struct GivensRot {
-    size_t b;     ///< bond b --- b+1
-    T c, s, r;  ///< cos and sin and radius
-
-    GivensRot(size_t b_) : b(b_) {}
-
-    /// to eliminate p from (p,q). Adapted from eigen.tuxfamily.org
-    static GivensRot<double> createFromPair(size_t b, double p,  double q)
-    {
-        using Scalar=double;
-        using std::sqrt;
-        using std::abs;
-
-        GivensRot<double> g(b);
-        std::swap(p,q); // to eliminate the p instead of q.
-        if(q==Scalar(0))
-        {
-            g.c = p<Scalar(0) ? Scalar(-1) : Scalar(1);
-            g.s = Scalar(0);
-            g.r = abs(p);
-        }
-        else if(p==Scalar(0))
-        {
-            g.c = Scalar(0);
-            g.s = q<Scalar(0) ? Scalar(1) : Scalar(-1);
-            g.r = abs(q);
-        }
-        else if(abs(p) > abs(q))
-        {
-            Scalar t = q/p;
-            Scalar u = sqrt(Scalar(1) + t*t);
-            if(p<Scalar(0))
-                u = -u;
-            g.c = Scalar(1)/u;
-            g.s = -t * g.c;
-            g.r = p * u;
-        }
-        else
-        {
-            Scalar t = p/q;
-            Scalar u = sqrt(Scalar(1) + t*t);
-            if(q<Scalar(0))
-                u = -u;
-            g.s = -Scalar(1)/u;
-            g.c = -t * g.s;
-            g.r = q * u;
-        }
-        return g;
-    }
-
-    static GivensRot<std::complex<double>> createFromPair(size_t b, std::complex<double> p, std::complex<double> q)
-    {
-        using Scalar=T;
-        using RealScalar=double;
-        using std::sqrt;
-        using std::abs;
-        using std::conj;
-
-        GivensRot<T> g(b);
-        std::swap(p,q); // to eliminate the p instead of q.
-        if(q==Scalar(0))
-        {
-            g.c = std::real(p)<0 ? Scalar(-1) : Scalar(1);
-            g.s = 0;
-            g.r = g.c * p;
-        }
-        else if(p==Scalar(0))
-        {
-            g.c = 0;
-            g.s = -q/abs(q);
-            g.r = abs(q);
-        }
-        else
-        {
-            RealScalar p1 = std::abs(p);
-            RealScalar q1 = std::abs(q);
-            if(p1>=q1)
-            {
-                Scalar ps = p / p1;
-                RealScalar p2 = std::norm(ps);
-                Scalar qs = q / p1;
-                RealScalar q2 = std::norm(qs);
-
-                RealScalar u = sqrt(RealScalar(1) + q2/p2);
-                if(std::real(p)<RealScalar(0))
-                    u = -u;
-
-                g.c = Scalar(1)/u;
-                g.s = -qs*conj(ps)*(g.c/p2);
-                g.r = p * u;
-            }
-            else
-            {
-                Scalar ps = p / q1;
-                RealScalar p2 = std::norm(ps);
-                Scalar qs = q / q1;
-                RealScalar q2 = std::norm(qs);
-
-                RealScalar u = q1 * sqrt(p2 + q2);
-                if(std::real(p)<RealScalar(0))
-                    u = -u;
-
-                p1 = abs(p);
-                ps = p/p1;
-                g.c = p1/u;
-                g.s = -conj(ps) * (q/u);
-                g.r = ps * u;
-            }
-        }
-        return g;
-    }
-
-    double angle() const { return atan2(s,c); }
-
-    typename arma::Mat<T>::template fixed<2,2> matrix() const { return {{c,s},{-s,c}}; }
-
-    void transposeInPlace() {s=-s;}
-};
-
-template<class T>
-arma::Mat<T> matrot_from_Givens(std::vector<GivensRot<T>> const& gates, size_t n=0)
-{
-    if (n==0) {
-        for(const GivensRot<T>& g : gates) if (g.b>n) n=g.b;
-        n+=2;
-    }
-    arma::Mat<T> rot(n,n, arma::fill::eye);
-    for(int i=gates.size()-1; i>=0; i--) { // apply to the right in reverse
-//    for(auto i=0u; i<gates.size(); i++) {
-        const GivensRot<T>& g=gates[i];
-        rot.submat(0,g.b,n-1,g.b+1) = rot.submat(0,g.b,n-1,g.b+1) * g.matrix();
-    }
-    return rot;
-}
-
-
 
 struct HamSys {
     itensor::Fermion sites;
@@ -368,73 +198,79 @@ struct Fermionic {
         return {i0,j0};
     }
 
-    // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
-    static std::vector<GivensRot<>> GivensRotForMatrix(arma::mat const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10)
-    {
-        using namespace arma;
-        arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
-        std::vector<GivensRot<>> gs;
-        arma::mat evec;
-        arma::vec eval;
-        auto evalRef=conv_to<std::vector<double>>::from( eig_sym(cc1) );
-        size_t d=blockSize;
-        for(auto p2=cc1.n_rows-1; p2>0u; p2--) {
-            size_t p1= (p2+1>d) ? p2+1-d : 0u ;
-            arma::mat cc2=cc1.submat(p1,p1,p2,p2);
-            arma::eig_sym(eval,evec,cc2);
-            // select the less active
-            auto [i0,j0]=bestMatching(conv_to<std::vector<double>>::from(eval), evalRef);
-            evalRef.erase(evalRef.begin()+j0);
-            arma::vec v=evec.col(i0);
-            if (1-std::abs(v.back())<tolEvec) continue; // already done
-            std::vector<GivensRot<>> gs1;
-            for(auto i=0u; i+1<v.size(); i++)
-            {
-                auto b=i+p1;
-                auto g=GivensRot<>::createFromPair(b,v[i],v[i+1]);
-                gs1.push_back(g);
-                v[i+1]=g.r;
-            }
-            auto rot1=matrot_from_Givens(gs1);
-            cc1.submat(0,0,p2,p2)=rot1*cc1.submat(0,0,p2,p2)*rot1.t();
-            for(auto g : gs1) { g.b+=nExclude; gs.push_back(g); }
-        }
-        return gs;
-    }
+    // // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
+    // static std::vector<GivensRot<>> GivensRotForMatrix(arma::mat const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10)
+    // {
+    //     using namespace arma;
+    //     arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
+    //     std::vector<GivensRot<>> gs;
+    //     arma::mat evec;
+    //     arma::vec eval;
+    //     auto evalRef=conv_to<std::vector<double>>::from( eig_sym(cc1) );
+    //     size_t d=blockSize;
+    //     for(auto p2=cc1.n_rows-1; p2>0u; p2--) {
+    //         size_t p1= (p2+1>d) ? p2+1-d : 0u ;
+    //         arma::mat cc2=cc1.submat(p1,p1,p2,p2);
+    //         arma::eig_sym(eval,evec,cc2);
+    //         // select the less active
+    //         auto [i0,j0]=bestMatching(conv_to<std::vector<double>>::from(eval), evalRef);
+    //         evalRef.erase(evalRef.begin()+j0);
+    //         arma::vec v=evec.col(i0);
+    //         if (1-std::abs(v.back())<tolEvec) continue; // already done
+    //         std::vector<GivensRot<>> gs1;
+    //         for(auto i=0u; i+1<v.size(); i++)
+    //         {
+    //             auto b=i+p1;
+    //             auto g=GivensRot<>::createFromPair(b,v[i],v[i+1]);
+    //             gs1.push_back(g);
+    //             v[i+1]=g.r;
+    //         }
+    //         auto rot1=matrot_from_Givens(gs1);
+    //         cc1.submat(0,0,p2,p2)=rot1*cc1.submat(0,0,p2,p2)*rot1.t();
+    //         for(auto g : gs1) { g.b+=nExclude; gs.push_back(g); }
+    //     }
+    //     return gs;
+    // }
 
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
-    static std::vector<GivensRot<>> GivensRotForRot(arma::mat rot)
-    {
-        using namespace arma;
-        std::vector<GivensRot<>> givens;
-        for(auto p2=rot.n_cols-1; p2>0u; p2--) {
-            arma::vec v=rot.col(p2);
-            std::vector<GivensRot<>> gs1;
-            for(auto i=0u; i+1<=p2; i++)
-            {
-                auto g=GivensRot<>::createFromPair(i,v[i],v[i+1]);
-                gs1.push_back(g);
-                v[i+1]=g.r;
-            }
-            auto rot1=matrot_from_Givens(gs1);
-            rot.rows(0,p2)=rot1*rot.rows(0,p2);
-            for(auto g : gs1) givens.push_back(g);
-        }
-        // rot.clean(1e-15).print("rot after extracting the Givens rotations");
-        return givens;
-    }
+    // static std::vector<GivensRot<>> GivensRotForRot(arma::mat rot)
+    // {
+    //     using namespace arma;
+    //     std::vector<GivensRot<>> givens;
+    //     for(auto p2=rot.n_cols-1; p2>0u; p2--) {
+    //         arma::vec v=rot.col(p2);
+    //         std::vector<GivensRot<>> gs1;
+    //         for(auto i=0u; i+1<=p2; i++)
+    //         {
+    //             auto g=GivensRot<>::createFromPair(i,v[i],v[i+1]);
+    //             gs1.push_back(g);
+    //             v[i+1]=g.r;
+    //         }
+    //         auto rot1=matrot_from_Givens(gs1);
+    //         rot.rows(0,p2)=rot1*rot.rows(0,p2);
+    //         for(auto g : gs1) givens.push_back(g);
+    //     }
+    //     // rot.clean(1e-15).print("rot after extracting the Givens rotations");
+    //     return givens;
+    // }
 
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
-    static std::vector<itensor::BondGate> NOGates(itensor::Fermion const& sites, std::vector<GivensRot<>> const& gs)
+    template<class T>
+    static std::vector<itensor::BondGate> NOGates(itensor::Fermion const& sites, std::vector<GivensRot<T>> const& gs)
     {
         using itensor::BondGate;
         using itensor::Cplx_i;
         std::vector<itensor::BondGate> gates;
-        for(const GivensRot<>& g : gs)
+        for(const GivensRot<T>& g : gs)
         {
             int b=g.b+1;
-            auto hterm = ( sites.op("Adag",b)*sites.op("A",b+1)
-                          -sites.op("Adag",b+1)*sites.op("A",b))* (g.angle()*Cplx_i);
+            auto Kin=g.ilogMatrix();
+            // auto hterm = ( sites.op("Adag",b)*sites.op("A",b+1)
+            //               -sites.op("Adag",b+1)*sites.op("A",b))* (g.angle()*Cplx_i);
+            itensor::ITensor hterm;
+            for(auto i:{0,1})
+                for(auto j:{0,1})
+                    hterm += sites.op("Adag",b+i)*sites.op("A",b+j) * Kin(i,j);
             auto bg=BondGate(sites,b,b+1,BondGate::tReal,1,hterm);
             gates.push_back(bg);
         }
@@ -713,38 +549,38 @@ struct Fermionic {
         return {sites, h};
     }
 
-    static HamSys rotOp(arma::mat const& rot, int nExclude=2)
-    {
-        arma::mat rott=rot.t();
-        arma::cx_mat logrot;
-        const auto im=arma::cx_double(0,1);
-        {
-            auto [eval,evec]=eig_unitary(rott, nExclude);
-            arma::cx_vec logeval=-arma::log(eval)*im;
-            for(auto& x : logeval) { // fix sign of the
-                if (std::real(x)>M_PI/2) x -= M_PI;
-                else if (std::real(x)<-M_PI/2) x += M_PI;
-            }
-            logrot=evec*arma::diagmat(logeval)*evec.t();
-            if (norm(logeval)>0.1) logeval.print("log(eval)");
-            double err=arma::norm(rott-arma::expmat(im*logrot));
-            if (err>1e-13) std::cout<<"exp error="<<err<<std::endl;
+    // static HamSys rotOp(arma::mat const& rot, int nExclude=2)
+    // {
+    //     arma::mat rott=rot.t();
+    //     arma::cx_mat logrot;
+    //     const auto im=arma::cx_double(0,1);
+    //     {
+    //         auto [eval,evec]=eig_unitary(rott, nExclude);
+    //         arma::cx_vec logeval=-arma::log(eval)*im;
+    //         for(auto& x : logeval) { // fix sign of the
+    //             if (std::real(x)>M_PI/2) x -= M_PI;
+    //             else if (std::real(x)<-M_PI/2) x += M_PI;
+    //         }
+    //         logrot=evec*arma::diagmat(logeval)*evec.t();
+    //         if (norm(logeval)>0.1) logeval.print("log(eval)");
+    //         double err=arma::norm(rott-arma::expmat(im*logrot));
+    //         if (err>1e-13) std::cout<<"exp error="<<err<<std::endl;
 
-            double err_herm=norm(logrot.t()-logrot);
-            if (err_herm>1e-13) std::cout<<"Hermitian error="<<err_herm<<std::endl;
-        }
-        arma::cx_mat kin=logrot; //arma::logmat(rott)*im; // we need to invert the rotation
+    //         double err_herm=norm(logrot.t()-logrot);
+    //         if (err_herm>1e-13) std::cout<<"Hermitian error="<<err_herm<<std::endl;
+    //     }
+    //     arma::cx_mat kin=logrot; //arma::logmat(rott)*im; // we need to invert the rotation
 
-        if (norm(kin)>0.1) kin.print("kin");
-        auto L=rot.n_cols;
-        itensor::Fermion sites(L, {"ConserveNf=",true});
-        itensor::AutoMPO h(sites);
-        for(int i=0;i<L; i++)
-            for(int j=0;j<L; j++)
-                if (std::abs(kin(i,j))>1e-15)
-                    h += kin(i,j),"Cdag",i+1,"C",j+1;
-        return {sites, itensor::toMPO(h)};
-    }
+    //     if (norm(kin)>0.1) kin.print("kin");
+    //     auto L=rot.n_cols;
+    //     itensor::Fermion sites(L, {"ConserveNf=",true});
+    //     itensor::AutoMPO h(sites);
+    //     for(int i=0;i<L; i++)
+    //         for(int j=0;j<L; j++)
+    //             if (std::abs(kin(i,j))>1e-15)
+    //                 h += kin(i,j),"Cdag",i+1,"C",j+1;
+    //     return {sites, itensor::toMPO(h)};
+    // }
 
 };
 

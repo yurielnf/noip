@@ -49,46 +49,6 @@ auto computeGS(HamSys const& sys)
     return sol_gs;
 }
 
-void TestGivens()
-{
-    { // 2d case
-        arma::vec v={0.5,1.5};
-        auto g=GivensRot<>::createFromPair(0,v[0],v[1]);
-        g.matrix().print("g");
-        (g.matrix()*v).print("g*v");
-    }
-    { // 3d case
-        vector<GivensRot<>> gs;
-        arma::vec v={0.5,1.5,-1}, vc=v;
-        for(auto i=0u; i+1<v.size(); i++)
-        {
-            auto b=i;
-            auto g=GivensRot<>::createFromPair(b,v[i],v[i+1]);
-            gs.push_back(g);
-            v[i+1]=g.r;
-        }
-        auto rot=matrot_from_Givens(gs);
-        (rot*vc).print("rot*v");
-    }
-    { // matrix case
-        vector<GivensRot<>> gs;
-        arma::mat A(3,3, arma::fill::randu), evec;
-        arma::vec eval;
-        A = A*A.t();
-        arma::eig_sym(eval,evec,A);
-        arma::vec v=evec.col(0), vc=v;
-        for(auto i=0u; i+1<v.size(); i++)
-        {
-            auto b=i;
-            auto g=GivensRot<>::createFromPair(b,v[i],v[i+1]);
-            gs.push_back(g);
-            v[i+1]=g.r;
-        }
-        auto rot=matrot_from_Givens(gs);
-        (rot*vc).print("rot*v");
-        (rot*A*rot.t()).print("rot.t()*A*rot");
-    }
-}
 
 /// return a rotation rot such that rot(:,B).t()*kin*rot(:,B) is diagonal where B are the inactive eigenvectors of cc (with eval=0 or 1).
 arma::cx_mat MagicRotation(arma::cx_mat const& cc, arma::cx_mat const& kin, double tolWannier)
@@ -150,7 +110,8 @@ arma::cx_mat MagicRotation(arma::cx_mat const& cc, arma::cx_mat const& kin, doub
 int main(int argc, char **argv)
 {
     using namespace itensor;
-    using namespace arma;
+    using namespace arma;    
+
     cout<<"irlm_nat_orb [len=20] [hamRestricted=1] [dt=0.1] [circuit_dt=0.1]"<<endl;
 //    TestGivens();
     int len=20, nExclude=2;

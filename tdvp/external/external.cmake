@@ -18,7 +18,13 @@ FetchContent_Declare(
  GIT_TAG        stable
 )
 
-FetchContent_MakeAvailable(pybind11 armadillo carma)
+FetchContent_Declare(
+  Catch2
+  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+  GIT_TAG        v2.x
+)
+
+FetchContent_MakeAvailable(pybind11 armadillo carma Catch2)
 
 
 add_library(itensor STATIC IMPORTED) # or STATIC instead of SHARED
