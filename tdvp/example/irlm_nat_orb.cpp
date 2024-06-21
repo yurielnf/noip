@@ -506,7 +506,6 @@ int main(int argc, char **argv)
     out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<" "<<cd<<endl;
     arma::uvec inactive=arma::find(cc.diag()<=tolWannier || cc.diag()>=1-tolWannier);
     auto model2_ip=IRLM_ip{model2};
-    arma::cx_mat rotg=rot*arma::cx_double(1.0);
     for(auto i=0; i*dt<=len; i++) {
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         itensor::cpu_time t0;
@@ -539,14 +538,14 @@ int main(int argc, char **argv)
             auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,40);
 //            auto givens=Fermionic::GivensRotForMatrix(cc,nExcludeGs,20);
             auto rot1=matrot_from_Givens(givens,cc.n_rows);
-            //(rot1.t() * cc * rot1).print("rot1.t()*cc*rot1");
+            //(rot1 * cc * rot1.t()).eval().clean(1e-9).submat(nExcludeGs,nExcludeGs,cc.n_rows-1,cc.n_rows-1).print("rot1*cc*rot1.t()");
             auto gates=Fermionic::NOGates(sol.hamsys.sites,givens);
             gateTEvol(gates,1,1,psi,{"Cutoff",1e-10,"Quiet",true, "DoNormalize",true});
             cout<<"circuit1:"<<t0.sincemark()<<endl;
             t0.mark();
             //cc=Fermionic::cc_matrix(psi, sol.hamsys.sites);
-            //cc.print("cc after rot");
-            rotg = rotg*rot1.t();
+            //cc.clean(1e-10).submat(nExcludeGs,nExcludeGs,cc.n_rows-1,cc.n_rows-1).print("cc after rot");
+            rot = rot*rot1.t();
             cc=rot1*cc*rot1.t();
             psi.orthogonalize({"Cutoff",1e-9});
             inactive=arma::find(cc.diag()<=tolWannier || cc.diag()>=1-tolWannier);
