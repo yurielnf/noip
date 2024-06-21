@@ -67,7 +67,7 @@ TEST_CASE( "GivensRotation real" )
         auto rot=matrot_from_Givens(gs);
         REQUIRE(norm(rot*rot.t()-eye(size(rot)))<tol);
         arma::mat Arot=rot*A*rot.t();
-        REQUIRE(std::abs(Arot(2,2)/eval(0)-1));
+        REQUIRE(std::abs(Arot(2,2)/eval(0)-1)<tol*norm(A));
         REQUIRE(std::abs(Arot(0,2)/norm(A))<tol);
         REQUIRE(std::abs(Arot(1,2)/norm(A))<tol);
     }
@@ -90,11 +90,7 @@ TEST_CASE( "GivensRotation complex" )
     {
         cx_mat h=g.ilogMatrix();
         REQUIRE(norm(h-h.t())<tol);
-        arma::cx_mat evec;
-        arma::vec eval;
-        arma::eig_sym(eval,evec,h);
-        arma::cx_mat exp_ih=evec * arma::diagmat(arma::exp(eval*cmpx(0,-1))) * evec.t();
-        REQUIRE(norm(g.matrix()-exp_ih)<tol);
+        REQUIRE(norm(g.matrix()-expIH(h))<tol);
     }
 
     SECTION("3d case")
@@ -132,8 +128,9 @@ TEST_CASE( "GivensRotation complex" )
         }
         auto rot=matrot_from_Givens(gs);
         REQUIRE(norm(rot*rot.t()-eye(size(rot)))<tol);
+        REQUIRE(norm(rot.t()*rot-eye(size(rot)))<tol);
         arma::cx_mat Arot=rot*A*rot.t();
-        REQUIRE(std::abs(Arot(2,2)/eval(0)-1.0));
+        REQUIRE(std::abs(Arot(2,2)/eval(0)-1.0)<tol*norm(A));
         REQUIRE(std::abs(Arot(0,2)/norm(A))<tol);
         REQUIRE(std::abs(Arot(1,2)/norm(A))<tol);
     }

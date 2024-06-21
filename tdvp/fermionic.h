@@ -171,7 +171,7 @@ struct Fermionic {
             size_t pos=0;
             if (1-eval.back()<eval(0)) pos=eval.size()-1;
             arma::Col<T> v=evec.col(pos);
-            if (1-std::abs(v.back())<tolEvec) continue; // already done
+            //if (1-std::abs(v.back())<tolEvec) continue; // already done
             std::vector<GivensRot<T>> gs1;
             for(auto i=0u; i+1<v.size(); i++)
             {
@@ -269,13 +269,15 @@ struct Fermionic {
             // auto hterm = ( sites.op("Adag",b)*sites.op("A",b+1)
             //               -sites.op("A",b+1)*sites.op("A",b))* (g.angle()*Cplx_i);
             itensor::ITensor hterm;
-            hterm += sites.op("Adag",b)*sites.op("A",b+1) * Kin(0,1);
-            hterm += sites.op("A",b)*sites.op("Adag",b+1) * Kin(1,0);
-            hterm += sites.op("N",b)*sites.op("Id",b+1) * Kin(0,0);
-            hterm += sites.op("Id",b)*sites.op("N",b+1) * Kin(1,1);
+            if (std::abs(Kin(0,1))>1e-15) hterm += sites.op("Adag",b)*sites.op("A",b+1) * Kin(0,1);
+            if (std::abs(Kin(1,0))>1e-15) hterm += sites.op("A",b)*sites.op("Adag",b+1) * Kin(1,0);
+            if (std::abs(Kin(0,0))>1e-15) hterm += sites.op("N",b)*sites.op("Id",b+1) * Kin(0,0);
+            if (std::abs(Kin(1,1))>1e-15) hterm += sites.op("Id",b)*sites.op("N",b+1) * Kin(1,1);
 
-            auto bg=BondGate(sites,b,b+1,BondGate::tReal,1,hterm);
-            gates.push_back(bg);
+            if (hterm) {
+                auto bg=BondGate(sites,b,b+1,BondGate::tReal,1,hterm);
+                gates.push_back(bg);
+            }
         }
         return gates;
     }
