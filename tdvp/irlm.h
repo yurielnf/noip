@@ -107,7 +107,7 @@ struct IRLM_ip {
 
     explicit IRLM_ip(const IRLM& irlm_)
         : irlm(irlm_)
-        , sites(irlm_.L, {"ConserveNf=",true})
+        , sites(irlm_.L, {"ConserveQNs=",false})
         , hImp (sites)
     {
         arma::mat Umat;
@@ -120,19 +120,8 @@ struct IRLM_ip {
                     hImp += Umat(i,j),"N", i+1,"N", j+1;
     }
 
-    HamSys Ham(arma::mat const& rot) const
-    {
-        arma::mat Kin=rot.t()*K*rot;
-        auto h=hImp;
-        for(auto i=0; i<sites.length(); i++)
-            for(auto j=0; j<sites.length(); j++)
-            if (std::abs(Kin(i,j))>1e-15)
-                h += Kin(i,j),"Cdag",i+1,"C",j+1;
-        auto mpo=itensor::toMPO(h);
-        return {sites,mpo,mpo};
-    }
-
-    HamSys Ham(arma::cx_mat const& rot) const
+    template<class T>
+    HamSys Ham(arma::Mat<T> const& rot) const
     {
         arma::cx_mat Kin=rot.t()*K*rot;
         auto h=hImp;

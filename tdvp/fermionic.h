@@ -33,14 +33,14 @@ struct Fermionic {
 
 
     explicit Fermionic(arma::mat const& Kmat_, arma::mat const& Umat_={}, std::map<std::array<int,4>, double> const& Vijkl_={})
-        : Kmat(Kmat_), Umat(Umat_), Vijkl(Vijkl_), sites(Kmat_.n_rows, {"ConserveNf=",true})
+        : Kmat(Kmat_), Umat(Umat_), Vijkl(Vijkl_), sites(Kmat_.n_rows, {"ConserveQNs=",false})
     {}
 
     Fermionic(arma::mat const& Kmat_, arma::mat const& Umat_,
               arma::mat const& Rot_, bool rotateKin=true)
         : Kmat(rotateKin ? Rot_.t()*Kmat_*Rot_ : Kmat_)
         , Umat(Umat_), Rot(Rot_)
-        , sites(Kmat_.n_rows, {"ConserveNf=",true})
+        , sites(Kmat_.n_rows, {"ConserveQNs=",false})
     {}
 
     int length() const { return Kmat.n_rows; }
@@ -257,6 +257,33 @@ struct Fermionic {
 
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
     template<class T>
+    static std::vector<itensor::BondGate> NOGates1(itensor::Fermion const& sites, std::vector<GivensRot<T>> const& gs)
+    {
+        using itensor::BondGate;
+        using itensor::Cplx_i;
+        std::vector<itensor::BondGate> gates;
+        for(const GivensRot<T>& g : gs)
+        {
+            int b=g.b+1;
+            auto Kin=(g.ilogMatrix()*(-1.0)).eval();
+            // auto hterm = ( sites.op("Adag",b)*sites.op("A",b+1)
+            //               -sites.op("A",b+1)*sites.op("A",b))* (g.angle()*Cplx_i);
+            itensor::ITensor hterm;
+            if (std::abs(Kin(0,1))>1e-15) hterm += sites.op("Adag",b)*sites.op("A",b+1) * Kin(1,0);
+            if (std::abs(Kin(1,0))>1e-15) hterm += sites.op("A",b)*sites.op("Adag",b+1) * Kin(0,1);
+            if (std::abs(Kin(0,0))>1e-15) hterm += sites.op("N",b)*sites.op("Id",b+1) * Kin(0,0);
+            if (std::abs(Kin(1,1))>1e-15) hterm += sites.op("Id",b)*sites.op("N",b+1) * Kin(1,1);
+
+            if (hterm) {
+                auto bg=BondGate(sites,b,b+1,BondGate::tReal,1,hterm);
+                gates.push_back(bg);
+            }
+        }
+        return gates;
+    }
+
+    // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
+    template<class T>
     static std::vector<itensor::BondGate> NOGates(itensor::Fermion const& sites, std::vector<GivensRot<T>> const& gs)
     {
         using itensor::BondGate;
@@ -265,17 +292,22 @@ struct Fermionic {
         for(const GivensRot<T>& g : gs)
         {
             int b=g.b+1;
-            auto Kin=g.ilogMatrix();
-            // auto hterm = ( sites.op("Adag",b)*sites.op("A",b+1)
-            //               -sites.op("A",b+1)*sites.op("A",b))* (g.angle()*Cplx_i);
-            itensor::ITensor hterm;
-            if (std::abs(Kin(0,1))>1e-15) hterm += sites.op("Adag",b)*sites.op("A",b+1) * Kin(0,1);
-            if (std::abs(Kin(1,0))>1e-15) hterm += sites.op("A",b)*sites.op("Adag",b+1) * Kin(1,0);
-            if (std::abs(Kin(0,0))>1e-15) hterm += sites.op("N",b)*sites.op("Id",b+1) * Kin(0,0);
-            if (std::abs(Kin(1,1))>1e-15) hterm += sites.op("Id",b)*sites.op("N",b+1) * Kin(1,1);
+            auto rot=g.matrix();//.t().eval();
+
+            auto s1 = sites(b);
+            auto s2 = sites(b+1);
+            auto s1p = prime(sites(b));
+            auto s2p = prime(sites(b+1));
+            itensor::ITensor hterm(s1,s2,s1p,s2p);
+            hterm.set(s1(1),s2(1),s1p(1),s2p(1), 1);
+            hterm.set(s1(2),s2(2),s1p(2),s2p(2), 1);
+            hterm.set(s1(2),s2(1),s1p(2),s2p(1), rot(0,0));
+            hterm.set(s1(2),s2(1),s1p(1),s2p(2), std::conj(rot(1,0)));
+            hterm.set(s1(1),s2(2),s1p(2),s2p(1), std::conj(rot(0,1)));
+            hterm.set(s1(1),s2(2),s1p(1),s2p(2), rot(1,1));
 
             if (hterm) {
-                auto bg=BondGate(sites,b,b+1,BondGate::tReal,1,hterm);
+                auto bg=BondGate(sites,b,b+1,hterm);
                 gates.push_back(bg);
             }
         }
@@ -544,7 +576,7 @@ struct Fermionic {
         }
         arma::cx_mat kin=logrot; //arma::logmat(rott)*im; // we need to invert the rotation
         auto L=rot.n_cols;
-        itensor::Fermion sites(L, {"ConserveNf=",true});
+        itensor::Fermion sites(L, {"ConserveQNs=",false});
         itensor::AutoMPO h(sites);
         for(int i=0;i<L; i++)
             for(int j=0;j<L; j++)

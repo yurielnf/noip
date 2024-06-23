@@ -112,7 +112,7 @@ int main(int argc, char **argv)
 {
     using namespace itensor;
     using namespace arma;
-    using matriz=arma::mat;
+    using matriz=arma::cx_mat;
 
     cout<<"irlm_nat_orb [len=20] [hamRestricted=1] [dt=0.1] [circuit_dt=0.1]"<<endl;
 //    TestGivens();
@@ -128,11 +128,11 @@ int main(int argc, char **argv)
 
     cout<<"\n-------------------------- solve the gs2 ----------------\n" << setprecision(15);
 
-    matriz rot = model2.irlm.rotStar() ;//* cx_double(1,0);
+    matriz rot = model2.irlm.rotStar() * cx_double(1,0);
     auto sol2a=computeGS(model2.Ham(rot));
 
     //arma::mat xOp=arma::diagmat(arma::regspace(0,len-1));
-    matriz cc=real(Fermionic::cc_matrix(sol2a.psi, sol2a.hamsys.sites)); // * cx_double(1,0);  ///<------------- real!
+    matriz cc=Fermionic::cc_matrix(sol2a.psi, sol2a.hamsys.sites) * cx_double(1,0);  ///<------------- real!
     //cc.save("cc_L"s+to_string(len)+"_gs2_star.txt",arma::raw_ascii);
     //rot.save("orb_L"s+to_string(len)+"_gs2_star.txt",arma::raw_ascii);
 
@@ -168,7 +168,7 @@ int main(int argc, char **argv)
     auto sys2b=model2.Ham(rot);
     auto sol2b=computeGS(sys2b);
 
-    cc=real(Fermionic::cc_matrix(sol2b.psi, sol2b.hamsys.sites)); // * cx_double(1,0);
+    cc=Fermionic::cc_matrix(sol2b.psi, sol2b.hamsys.sites) * cx_double(1,0);
     cc.save("cc_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
     rot.save("orb_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
     {
@@ -197,7 +197,7 @@ int main(int argc, char **argv)
     }
     auto sys1a=model1.Ham(rot);
     auto sol1a=computeGS(sys1a);
-    cc=arma::real(Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites)); //* cx_double(1,0);
+    cc=Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites)* cx_double(1,0);
 
     //cc.save("cc_L"s+to_string(len)+"_gs1.txt",arma::raw_ascii);
     //rot.save("orb_L"s+to_string(len)+"_gs1.txt",arma::raw_ascii);
@@ -212,7 +212,7 @@ int main(int argc, char **argv)
     }
     auto sys1b=model1.Ham(rot);
     auto sol1b=computeGS(sys1b);
-    cc=real(Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites));//* cx_double(1,0);
+    cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites)* cx_double(1,0);
 
     cc.save("cc_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
     rot.save("orb_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
@@ -258,7 +258,7 @@ int main(int argc, char **argv)
         t0.mark();
 
         psi=sol.psi;
-        cc=arma::real(Fermionic::cc_matrix(psi, sol.hamsys.sites));//* cx_double(1,0);
+        cc=Fermionic::cc_matrix(psi, sol.hamsys.sites)* cx_double(1,0);
         cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
         if (std::abs(i*dt-std::round(i*dt/circuit_dt)*circuit_dt) < 0.5*dt) {        
@@ -270,10 +270,10 @@ int main(int argc, char **argv)
             gateTEvol(gates,1,1,psi,{"Cutoff",1e-10,"Quiet",true, "DoNormalize",true});
             cout<<"circuit1:"<<t0.sincemark()<<endl;
             t0.mark();
-            cc=real(Fermionic::cc_matrix(psi, sol.hamsys.sites));
-            real(cc.clean(1e-10).submat(nExcludeGs,nExcludeGs,cc.n_rows-1,cc.n_cols-1)).print("cc after rot");
+            matriz ccr=Fermionic::cc_matrix(psi, sol.hamsys.sites);
+            real(ccr.clean(1e-7).submat(nExcludeGs,nExcludeGs,cc.n_rows-1,cc.n_cols-1)).print("cc after rot");
             rot = rot*rot1.t();
-            //cc=rot1*cc*rot1.t();
+            cc=rot1*cc*rot1.t();
             psi.orthogonalize({"Cutoff",1e-9});
             vec ni=arma::real(cc.diag());
             inactive=arma::find(ni<=tolWannier || ni>=1-tolWannier);
