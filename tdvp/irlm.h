@@ -162,7 +162,7 @@ struct IRLM_ip {
         using namespace arma;
         arma::Mat<T> Kin=rot.t()*K*rot;
         arma::cx_mat rotK(size(rot), fill::eye);
-        rotK.submat(nImp,nImp, rot.n_rows-1,rot.n_rows-1)=expIH(Kin.submat(nImp,nImp, rot.n_rows-1,rot.n_rows-1) * dt);
+        rotK.submat(nImp,nImp, rot.n_rows-1,rot.n_rows-1)=expIH<T>(Kin.submat(nImp,nImp, rot.n_rows-1,rot.n_rows-1) * dt );
         return rotK;
     }
 };

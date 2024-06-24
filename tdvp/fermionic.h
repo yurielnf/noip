@@ -171,7 +171,7 @@ struct Fermionic {
             size_t pos=0;
             if (1-eval.back()<eval(0)) pos=eval.size()-1;
             arma::Col<T> v=evec.col(pos);
-            //if (1-std::abs(v.back())<tolEvec) continue; // already done
+            if (1-std::abs(v.back())<tolEvec) continue; // already done
             std::vector<GivensRot<T>> gs1;
             for(auto i=0u; i+1<v.size(); i++)
             {

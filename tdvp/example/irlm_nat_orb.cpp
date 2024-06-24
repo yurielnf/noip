@@ -207,7 +207,7 @@ int main(int argc, char **argv)
     if (true) { // circuit1
         auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,40);
         auto rot1=matrot_from_Givens(givens,cc.n_rows);
-        rot = rot*rot1.t();
+        rot = rot*rot1.st();
         cc=rot1*cc*rot1.t();
     }
     auto sys1b=model1.Ham(rot);
@@ -240,9 +240,9 @@ int main(int argc, char **argv)
         cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         itensor::cpu_time t0;
         auto sys2 = hamRestricted ?
-                    model2_ip.HamIP(rot,len-inactive.size(),dt) :
+                    model2_ip.HamIP(rot,nExcludeGs,dt) : //len-inactive.size()
                     model2_ip.Ham(rot) ;
-        //if (hamRestricted) rot = rot * model2_ip.rotIP(rot,len-inactive.size(),dt);
+        if (hamRestricted) rot = rot * model2_ip.rotIP(rot,nExcludeGs,dt); //len-inactive.size()
         cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
         it_tdvp sol {sys2, psi};
@@ -265,14 +265,14 @@ int main(int argc, char **argv)
             auto givens=Fermionic::NOGivensRot(cc,nExcludeGs,40);
 //            auto givens=Fermionic::GivensRotForMatrix(cc,nExcludeGs,20);
             auto rot1=matrot_from_Givens(givens,cc.n_rows);
-            real((rot1 * cc * rot1.t()).eval().clean(1e-10).submat(nExcludeGs,nExcludeGs,cc.n_rows-1,cc.n_cols-1)).print("rot1*cc*rot1.t()");
+            //real((rot1 * cc * rot1.t()).eval().clean(1e-10).submat(nExcludeGs,nExcludeGs,cc.n_rows-1,cc.n_cols-1)).print("rot1*cc*rot1.t()");
             auto gates=Fermionic::NOGates(sol.hamsys.sites,givens);
             gateTEvol(gates,1,1,psi,{"Cutoff",1e-10,"Quiet",true, "DoNormalize",true});
             cout<<"circuit1:"<<t0.sincemark()<<endl;
             t0.mark();
-            matriz ccr=Fermionic::cc_matrix(psi, sol.hamsys.sites);
-            real(ccr.clean(1e-7).submat(nExcludeGs,nExcludeGs,cc.n_rows-1,cc.n_cols-1)).print("cc after rot");
-            rot = rot*rot1.t();
+            //matriz ccr=Fermionic::cc_matrix(psi, sol.hamsys.sites);
+            //real(ccr.clean(1e-7).submat(nExcludeGs,nExcludeGs,cc.n_rows-1,cc.n_cols-1)).print("cc after rot");
+            rot = rot*rot1.st();
             cc=rot1*cc*rot1.t();
             psi.orthogonalize({"Cutoff",1e-9});
             vec ni=arma::real(cc.diag());
