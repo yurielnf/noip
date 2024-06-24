@@ -139,7 +139,7 @@ struct IRLM_ip {
         if (nImp==rot.n_rows) return Ham(rot);
         arma::Mat<T> K0=rot.t()*K*rot;
         arma::cx_mat K1 = K0.submat(0, nImp, nImp-1, rot.n_rows-1) *
-                           K0.submat(nImp,nImp,rot.n_rows-1, rot.n_rows-1) * arma::cx_double(0,0.5*dt);
+                           K0.submat(nImp,nImp,rot.n_rows-1, rot.n_rows-1) * arma::cx_double(0,-0.5*dt);
         arma::cx_mat Kip=K0 * arma::cx_double(1,0);
         Kip.submat(nImp, nImp, rot.n_rows-1, rot.n_rows-1).fill(0.0);
         Kip.submat(0,0,nImp-1,nImp-1)=K0.submat(0,0,nImp-1,nImp-1) * arma::cx_double(1,0);
