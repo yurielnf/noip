@@ -123,8 +123,8 @@ int main(int argc, char **argv)
     if (argc>=3) hamRestricted=atoi(argv[2]);
     if (argc>=4) dt=atof(argv[3]);
     if (argc>=5) circuit_dt=atof(argv[4]);
-    auto model1=IRLM_ip {IRLM {.L=len, .t=0.5, .V=0.0, .U=0.25, .ed=-10, .connected=false}};
-    auto model2=IRLM_ip {IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=0.0}};
+    auto model1=IRLM_ip {IRLM {.L=len, .t=0.5, .V=0.0, .U=0.0, .ed=-10, .connected=false}};
+    auto model2=IRLM_ip {IRLM {.L=len, .t=0.5, .V=0.1, .U=0.0, .ed=0.0}};
 
     cout<<"\n-------------------------- solve the gs2 ----------------\n" << setprecision(15);
 

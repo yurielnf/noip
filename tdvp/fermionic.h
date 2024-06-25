@@ -33,14 +33,14 @@ struct Fermionic {
 
 
     explicit Fermionic(arma::mat const& Kmat_, arma::mat const& Umat_={}, std::map<std::array<int,4>, double> const& Vijkl_={})
-        : Kmat(Kmat_), Umat(Umat_), Vijkl(Vijkl_), sites(Kmat_.n_rows, {"ConserveQNs=",false})
+        : Kmat(Kmat_), Umat(Umat_), Vijkl(Vijkl_), sites(Kmat_.n_rows, {"ConserveNf",true})
     {}
 
     Fermionic(arma::mat const& Kmat_, arma::mat const& Umat_,
               arma::mat const& Rot_, bool rotateKin=true)
         : Kmat(rotateKin ? Rot_.t()*Kmat_*Rot_ : Kmat_)
         , Umat(Umat_), Rot(Rot_)
-        , sites(Kmat_.n_rows, {"ConserveQNs=",false})
+        , sites(Kmat_.n_rows, {"ConserveNf",true})
     {}
 
     int length() const { return Kmat.n_rows; }
@@ -171,7 +171,7 @@ struct Fermionic {
             size_t pos=0;
             if (1-eval.back()<eval(0)) pos=eval.size()-1;
             arma::Col<T> v=evec.col(pos);
-            if (1-std::abs(v.back())<tolEvec) continue; // already done
+            //if (1-std::abs(v.back())<tolEvec) continue; // already done
             std::vector<GivensRot<T>> gs1;
             for(auto i=0u; i+1<v.size(); i++)
             {
@@ -292,18 +292,18 @@ struct Fermionic {
         for(const GivensRot<T>& g : gs)
         {
             int b=g.b+1;
-            auto rot=g.matrix();//.t().eval();
+            auto rot=g.matrix().t().eval();
 
-            auto s1 = sites(b);
-            auto s2 = sites(b+1);
+            auto s1 = itensor::dag(sites(b));
+            auto s2 = itensor::dag(sites(b+1));
             auto s1p = prime(sites(b));
             auto s2p = prime(sites(b+1));
             itensor::ITensor hterm(s1,s2,s1p,s2p);
             hterm.set(s1(1),s2(1),s1p(1),s2p(1), 1);
             hterm.set(s1(2),s2(2),s1p(2),s2p(2), 1);
             hterm.set(s1(2),s2(1),s1p(2),s2p(1), rot(0,0));
-            hterm.set(s1(2),s2(1),s1p(1),s2p(2), std::conj(rot(1,0)));
-            hterm.set(s1(1),s2(2),s1p(2),s2p(1), std::conj(rot(0,1)));
+            hterm.set(s1(2),s2(1),s1p(1),s2p(2), rot(0,1));
+            hterm.set(s1(1),s2(2),s1p(2),s2p(1), rot(1,0));
             hterm.set(s1(1),s2(2),s1p(1),s2p(2), rot(1,1));
 
             if (hterm) {
@@ -576,7 +576,7 @@ struct Fermionic {
         }
         arma::cx_mat kin=logrot; //arma::logmat(rott)*im; // we need to invert the rotation
         auto L=rot.n_cols;
-        itensor::Fermion sites(L, {"ConserveQNs=",false});
+        itensor::Fermion sites(L, {"ConserveNf",true});
         itensor::AutoMPO h(sites);
         for(int i=0;i<L; i++)
             for(int j=0;j<L; j++)

@@ -107,7 +107,7 @@ struct IRLM_ip {
 
     explicit IRLM_ip(const IRLM& irlm_)
         : irlm(irlm_)
-        , sites(irlm_.L, {"ConserveQNs=",false})
+        , sites(irlm_.L, {"ConserveNf",true})
         , hImp (sites)
     {
         arma::mat Umat;
