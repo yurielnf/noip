@@ -27,12 +27,13 @@ int main()
     for(int L:{24,52,100,200}) {
 
         string folder=folderBase+"/L"+to_string(L);
+        string jobname=folderBase+"_L"+to_string(L);
         fs::create_directory(folder);
         j["irlm"]["L"]=L;
         ofstream out(folder+"/param.json");
         out<<setw(4)<<j<<endl;
         fs::current_path(folder);
-        string cmd="sbatch -J "s+folder+" --output=out_"+folder+" ../../submit.sh";
+        string cmd="sbatch -J "s+jobname+" ../../submit.sh";
         system(cmd.c_str());
         fs::current_path("../..");
     }

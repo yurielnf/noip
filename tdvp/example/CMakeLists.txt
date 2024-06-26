@@ -6,6 +6,7 @@ foreach (test ${test_SRC})
     add_executable(${TName} ${TName}.cpp)
     target_compile_features(${TName} PUBLIC cxx_std_17)
     target_link_libraries(${TName} PRIVATE ${PROJECT_NAME})
+    target_link_libraries(${TName} PRIVATE stdc++fs)
     target_link_libraries(${TName} PRIVATE nlohmann_json::nlohmann_json)
 endforeach()
 
