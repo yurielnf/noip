@@ -24,7 +24,9 @@ FetchContent_Declare(
   GIT_TAG        v2.x
 )
 
-FetchContent_MakeAvailable(pybind11 armadillo carma Catch2)
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz)
+
+FetchContent_MakeAvailable(pybind11 armadillo carma Catch2 json)
 
 
 add_library(itensor STATIC IMPORTED) # or STATIC instead of SHARED

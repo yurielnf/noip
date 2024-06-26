@@ -10,12 +10,13 @@ struct it_tdvp {
     int bond_dim=64;
     int nIter_diag=32;
     double rho_cutoff=1e-10;
-    double epsilonM=0; //1e-8;
+    double epsilonM=1e-8;
     std::complex<double> dt={0, 0.1};
     bool do_normalize=true;
     double err_goal=1e-8;
     bool silent=true;
     bool enrichByFit=false;
+    int nKrylov=3;
 
     int nsweep=0;
     double energy=0;
@@ -47,14 +48,14 @@ struct it_tdvp {
         if (epsilonM != 0)
         {
             // Global subspace expansion
-           std::vector<double> epsilonK(3,1E-8);
+           std::vector<double> epsilonK(nKrylov,1E-8);
            //std::vector<int> maxDimK(5,0.5*itensor::maxLinkDim(psi));
 
             if (hamsys.hamEnrich.length()==0) throw std::invalid_argument("hamsys.hamEnrich need to be defined for tdvp");
             itensor::addBasis(psi,hamsys.ham,epsilonK,
                      {"Cutoff",epsilonM,
                       "Method",enrichByFit ? "Fit" : "DensityMatrix",
-                      "KrylovOrd",3,
+                      "KrylovOrd",nKrylov,
                       "DoNormalize", do_normalize,
                       "Quiet",true,
                       "Silent",silent});
