@@ -1,0 +1,259 @@
+#LyX 2.3 created this file. For more info see http://www.lyx.org/
+\lyxformat 544
+\begin_document
+\begin_header
+\save_transient_properties true
+\origin unavailable
+\textclass article
+\use_default_options true
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman "default" "default"
+\font_sans "default" "default"
+\font_typewriter "default" "default"
+\font_math "auto" "auto"
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100 100
+\font_tt_scale 100 100
+\use_microtype false
+\use_dash_ligatures true
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\use_hyperref false
+\papersize default
+\use_geometry false
+\use_package amsmath 1
+\use_package amssymb 1
+\use_package cancel 1
+\use_package esint 1
+\use_package mathdots 1
+\use_package mathtools 1
+\use_package mhchem 1
+\use_package stackrel 1
+\use_package stmaryrd 1
+\use_package undertilde 1
+\cite_engine basic
+\cite_engine_type default
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\justification true
+\use_refstyle 1
+\use_minted 0
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\is_math_indent 0
+\math_numbering_side default
+\quotes_style english
+\dynamic_quotes 0
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+Impurity quench
+\end_layout
+
+\begin_layout Section
+Discrete interaction picture
+\end_layout
+
+\begin_layout Standard
+One step of time evolution, up to second order in 
+\begin_inset Formula $dt$
+\end_inset
+
+:
+\begin_inset Formula 
+\begin{equation}
+\begin{alignedat}{1}e^{h} & =e^{h_{12}+h_{2}}\\
+ & =e^{h_{2}}e^{-h_{2}}e^{h_{12}+h_{2}}\\
+ & \approx e^{h_{2}}e^{h_{12}+\frac{1}{2}[h_{12},h_{2}]}\\
+ & =e^{h_{2}}e^{h_{12}^{(1)}}
+\end{alignedat}
+\end{equation}
+
+\end_inset
+
+For the next time step, we change the orbitals (using the circuit) and the
+ definition of 
+\begin_inset Quotes eld
+\end_inset
+
+2
+\begin_inset Quotes erd
+\end_inset
+
+ also.
+ We need to compute:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+\begin{alignedat}{1}e^{h}e^{h_{2}^{(1)}} & =e^{h_{12}+h_{2}}e^{h_{2}^{(1)}}\\
+ & =e^{h_{12}+h_{2}+h_{2}^{(1)}+[h_{12}+h_{2},h_{2}^{(1)}]/2}\\
+ & =e^{h_{2}^{(2)}}e^{-h_{2}^{(2)}}e^{h_{12}+h_{2}^{(2)}+[h_{12}+h_{2}^{(2)},h_{2}^{(1)}]/2}\\
+ & =e^{h_{2}^{(2)}}e^{h_{12}+[h_{12}+h_{2}^{(2)},h_{2}^{(1)}]/2+[h_{12},h_{2}^{(2)}]/2}
+\end{alignedat}
+\end{equation}
+
+\end_inset
+
+After 
+\begin_inset Formula $T$
+\end_inset
+
+ time steps
+\begin_inset Formula 
+\begin{equation}
+\begin{alignedat}{1}e^{h}e^{h}...e^{h} & =e^{Th}e^{h_{12}^{(T)}}e^{h_{12}^{(T-1)}}...e^{h_{12}^{(1)}}\end{alignedat}
+\end{equation}
+
+\end_inset
+
+
+\begin_inset Formula 
+\begin{equation}
+h_{12}^{(t)}=h_{12}^{(t-1)}+\frac{t}{2}[h_{12},h_{2}]
+\end{equation}
+
+\end_inset
+
+with 
+\begin_inset Formula $t=1,2,..,T$
+\end_inset
+
+ and 
+\begin_inset Formula $h_{12}^{(0)}=h_{12}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Subsection
+Hybridization in the interaction picture
+\end_layout
+
+\begin_layout Standard
+We need this commutator:
+\begin_inset Formula 
+\begin{equation}
+\begin{alignedat}{1}[H_{12},H_{2}] & =t_{\alpha i}t_{jk}\left\{ [c_{\alpha}^{\dagger}c_{i},c_{j}^{\dagger}c_{k}]+[c_{i}^{\dagger}c_{\alpha},c_{j}^{\dagger}c_{k}]\right\} \\
+ & =t_{\alpha i}t_{jk}\left\{ c_{\alpha}^{\dagger}c_{k}\delta_{ij}-c_{j}^{\dagger}c_{\alpha}\delta_{ik}\right\} \\
+ & =t_{\alpha i}t_{ik}c_{\alpha}^{\dagger}c_{k}-t_{\alpha i}t_{ji}c_{j}^{\dagger}c_{\alpha}\\
+ & =t_{\alpha i}t_{ij}\left\{ c_{\alpha}^{\dagger}c_{j}-c_{j}^{\dagger}c_{\alpha}\right\} 
+\end{alignedat}
+\end{equation}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section*
+A1.
+ Useful formulas
+\end_layout
+
+\begin_layout Subsection*
+Commutators
+\end_layout
+
+\begin_layout Standard
+General relations:
+\begin_inset Formula 
+\begin{equation}
+[a,bc]=[a,b]c+b[a,c]
+\end{equation}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+[a,bc]=\{a,b\}c-b\{a,c\}
+\end{equation}
+
+\end_inset
+
+
+\begin_inset Formula 
+\begin{equation}
+[ab,c]=a[b,c]+[a,c]b
+\end{equation}
+
+\end_inset
+
+
+\begin_inset Formula 
+\begin{equation}
+[ab,c]=a\{b,c\}-\{a,c\}b
+\end{equation}
+
+\end_inset
+
+
+\begin_inset Formula 
+\begin{equation}
+[ab,cd]=a\{b,c\}d-\{a,c\}bd+ca\{b,d\}-c\{a,d\}b
+\end{equation}
+
+\end_inset
+
+Fermionic operators:
+\begin_inset Formula 
+\begin{equation}
+[c_{i}^{\dagger}c_{j},c_{k}^{\dagger}c_{l}]=c_{i}^{\dagger}c_{l}\delta_{jk}-c_{k}^{\dagger}c_{j}\delta_{il}\label{eq:ffcomm}
+\end{equation}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection*
+Exponential
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{equation}
+e^{xA}e^{xB}=e^{x(A+B)+\frac{1}{2}x^{2}[A,B]+\mathcal{O}(x^{3})}\label{eq:exp_bch}
+\end{equation}
+
+\end_inset
+
+
+\end_layout
+
+\end_body
+\end_document

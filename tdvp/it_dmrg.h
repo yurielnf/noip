@@ -26,6 +26,13 @@ struct it_dmrg {
         psi = itensor::randomMPS(state);
     }
 
+    it_dmrg(HamSys const& hamsys_, itensor::MPS psi_)
+        : hamsys {hamsys_}
+        , psi {psi_}
+    {
+        psi.replaceSiteInds(hamsys.sites.inds());
+    }
+
     void iterate()
     {
         auto sweeps = itensor::Sweeps(1);

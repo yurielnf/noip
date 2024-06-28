@@ -16,6 +16,7 @@ add_library(${PROJECT_NAME} STATIC
     irlm_wilson.h
     it_tdvp_error.h
     irlm_wilson_chain.h
+    givens_rotation.h
 )
 
 target_include_directories(${PROJECT_NAME} PUBLIC
@@ -27,8 +28,8 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 #set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 
-
 target_link_libraries(${PROJECT_NAME} PUBLIC "-Wl,--start-group" ${MKL_SEQUENTIAL_LAYER_LIBRARY} "-Wl,--end-group -lpthread -lm -ldl" tdvp itensor OpenMP::OpenMP_CXX)
+#target_link_libraries(${PROJECT_NAME} PUBLIC "-Wl,--start-group" $ENV{MKLROOT}/lib/intel64/libmkl_rt.so "-Wl,--end-group -Wl,--no-as-needed -lpthread -lm -ldl" tdvp itensor OpenMP::OpenMP_CXX)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC armadillo)
 
@@ -38,4 +39,8 @@ add_subdirectory(example)
 
 ##------------ wrapper ----------
 
-add_subdirectory(python)
+#add_subdirectory(python)
+
+#----------- tests -----------------
+
+add_subdirectory(test)
