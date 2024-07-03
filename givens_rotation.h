@@ -48,8 +48,8 @@ struct GivensRot {
 
     //GivensRot(size_t b_) : b(b_) {}
 
-    /// to transform J.t() (p,q)=(0,r). Adapted from eigen.tuxfamily.org
-    static GivensRot<T> createFromPair(size_t b, T p,  T q);
+    /// build the J s.t.  J * (p,q)=(0,r) is go_right=true. Adapted from eigen.tuxfamily.org
+    static GivensRot<T> createFromPair(size_t b, T p,  T q, bool go_right);
 
     //double angle() const { return atan2(s,c); }
 
@@ -69,14 +69,14 @@ struct GivensRot {
 
 
 template<>
-GivensRot<double> GivensRot<double>::createFromPair(size_t b, double p,  double q)
+GivensRot<double> GivensRot<double>::createFromPair(size_t b, double p,  double q, bool go_right)
 {
     using Scalar=double;
     using std::sqrt;
     using std::abs;
 
     GivensRot<double> g {.b=b};
-    std::swap(p,q); // to eliminate the p instead of q.
+    if (go_right) std::swap(p,q); // to eliminate the p instead of q.
     if(q==Scalar(0))
     {
         g.c = p<Scalar(0) ? Scalar(-1) : Scalar(1);
@@ -109,14 +109,15 @@ GivensRot<double> GivensRot<double>::createFromPair(size_t b, double p,  double 
         g.c = -t * g.s;
         g.r = q * u;
     }
+    if (go_right) { g.s=-g.s; }
     return g;
 }
 
 template<>
-GivensRot<double>::matrix22 GivensRot<double>::matrix() const { return {{c, s},{-s, c}}; }
+GivensRot<double>::matrix22 GivensRot<double>::matrix() const { return {{c, -s},{s, c}}; }
 
 template<>
-GivensRot<cmpx> GivensRot<cmpx>::createFromPair(size_t b, cmpx p, cmpx q)
+GivensRot<cmpx> GivensRot<cmpx>::createFromPair(size_t b, cmpx p, cmpx q, bool go_right)
 {
     using Scalar=cmpx;
     using RealScalar=double;
@@ -125,7 +126,7 @@ GivensRot<cmpx> GivensRot<cmpx>::createFromPair(size_t b, cmpx p, cmpx q)
     using std::conj;
 
     GivensRot<cmpx> g {.b=b};
-    std::swap(p,q); // to eliminate the p instead of q.
+    if (go_right) std::swap(p,q); // to eliminate the p instead of q.
     if(q==Scalar(0))
     {
         g.c = std::real(p)<0 ? Scalar(-1) : Scalar(1);
@@ -175,11 +176,13 @@ GivensRot<cmpx> GivensRot<cmpx>::createFromPair(size_t b, cmpx p, cmpx q)
             g.r = ps * u;
         }
     }
+    if (go_right) { g.s=-conj(g.s); } // assuming g.c is real!!
+
     return g;
 }
 
 template<>
-GivensRot<cmpx>::matrix22 GivensRot<cmpx>::matrix() const { return {{c, s},{-std::conj(s), std::conj(c)}}; }
+GivensRot<cmpx>::matrix22 GivensRot<cmpx>::matrix() const { return {{std::conj(c), -std::conj(s)},{s, c}}; }
 
 
 template<class T>

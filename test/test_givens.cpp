@@ -15,7 +15,7 @@ TEST_CASE( "GivensRotation real" )
 {
     double tol=1e-14;
     vec v(2, fill::randu);
-    auto g=GivensRot<>::createFromPair(0, v[0], v[1]);
+    auto g=GivensRot<>::createFromPair(0, v[0], v[1], true);
 
     SECTION( "definition" )
     {
@@ -38,7 +38,7 @@ TEST_CASE( "GivensRotation real" )
         for(auto i=0u; i+1<v.size(); i++)
         {
             auto b=i;
-            auto g=GivensRot<>::createFromPair(b,v[i],v[i+1]);
+            auto g=GivensRot<>::createFromPair(b,v[i],v[i+1], true);
             gs.push_back(g);
             v[i+1]=g.r;
         }
@@ -60,7 +60,7 @@ TEST_CASE( "GivensRotation real" )
         for(auto i=0u; i+1<v.size(); i++)
         {
             auto b=i;
-            auto g=GivensRot<>::createFromPair(b,v[i],v[i+1]);
+            auto g=GivensRot<>::createFromPair(b,v[i],v[i+1], true);
             gs.push_back(g);
             v[i+1]=g.r;
         }
@@ -77,7 +77,7 @@ TEST_CASE( "GivensRotation complex" )
 {
     double tol=1e-14;
     cx_vec v(2, fill::randu);
-    auto g=GivensRot<cmpx>::createFromPair(0, v[0], v[1]);
+    auto g=GivensRot<cmpx>::createFromPair(0, v[0], v[1], true);
 
     SECTION( "definition" )
     {
@@ -100,7 +100,7 @@ TEST_CASE( "GivensRotation complex" )
         for(auto i=0u; i+1<v.size(); i++)
         {
             auto b=i;
-            auto g=GivensRot<cmpx>::createFromPair(b,v[i],v[i+1]);
+            auto g=GivensRot<cmpx>::createFromPair(b,v[i],v[i+1], true);
             gs.push_back(g);
             v[i+1]=g.r;
         }
@@ -122,7 +122,7 @@ TEST_CASE( "GivensRotation complex" )
         for(auto i=0u; i+1<v.size(); i++)
         {
             auto b=i;
-            auto g=GivensRot<cmpx>::createFromPair(b,v[i],v[i+1]);
+            auto g=GivensRot<cmpx>::createFromPair(b,v[i],v[i+1],true);
             gs.push_back(g);
             v[i+1]=g.r;
         }

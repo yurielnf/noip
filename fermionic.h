@@ -177,7 +177,7 @@ struct Fermionic {
             {
                 //if (std::abs(v[i])<tolEvec) continue; // already done
                 auto b=i+p1;
-                auto g=GivensRot<T>::createFromPair(b,v[i],v[i+1]);
+                auto g=GivensRot<T>::createFromPair(b,v[i],v[i+1],true);
                 gs1.push_back(g);
                 v[i+1]=g.r;
             }
@@ -199,61 +199,93 @@ struct Fermionic {
         return {i0,j0};
     }
 
-    // // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
-    // static std::vector<GivensRot<>> GivensRotForMatrix(arma::mat const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10)
-    // {
-    //     using namespace arma;
-    //     arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
-    //     std::vector<GivensRot<>> gs;
-    //     arma::mat evec;
-    //     arma::vec eval;
-    //     auto evalRef=conv_to<std::vector<double>>::from( eig_sym(cc1) );
-    //     size_t d=blockSize;
-    //     for(auto p2=cc1.n_rows-1; p2>0u; p2--) {
-    //         size_t p1= (p2+1>d) ? p2+1-d : 0u ;
-    //         arma::mat cc2=cc1.submat(p1,p1,p2,p2);
-    //         arma::eig_sym(eval,evec,cc2);
-    //         // select the less active
-    //         auto [i0,j0]=bestMatching(conv_to<std::vector<double>>::from(eval), evalRef);
-    //         evalRef.erase(evalRef.begin()+j0);
-    //         arma::vec v=evec.col(i0);
-    //         if (1-std::abs(v.back())<tolEvec) continue; // already done
-    //         std::vector<GivensRot<>> gs1;
-    //         for(auto i=0u; i+1<v.size(); i++)
-    //         {
-    //             auto b=i+p1;
-    //             auto g=GivensRot<>::createFromPair(b,v[i],v[i+1]);
-    //             gs1.push_back(g);
-    //             v[i+1]=g.r;
-    //         }
-    //         auto rot1=matrot_from_Givens(gs1);
-    //         cc1.submat(0,0,p2,p2)=rot1*cc1.submat(0,0,p2,p2)*rot1.t();
-    //         for(auto g : gs1) { g.b+=nExclude; gs.push_back(g); }
-    //     }
-    //     return gs;
-    // }
 
-    // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
-    // static std::vector<GivensRot<>> GivensRotForRot(arma::mat rot)
-    // {
-    //     using namespace arma;
-    //     std::vector<GivensRot<>> givens;
-    //     for(auto p2=rot.n_cols-1; p2>0u; p2--) {
-    //         arma::vec v=rot.col(p2);
-    //         std::vector<GivensRot<>> gs1;
-    //         for(auto i=0u; i+1<=p2; i++)
-    //         {
-    //             auto g=GivensRot<>::createFromPair(i,v[i],v[i+1]);
-    //             gs1.push_back(g);
-    //             v[i+1]=g.r;
-    //         }
-    //         auto rot1=matrot_from_Givens(gs1);
-    //         rot.rows(0,p2)=rot1*rot.rows(0,p2);
-    //         for(auto g : gs1) givens.push_back(g);
-    //     }
-    //     // rot.clean(1e-15).print("rot after extracting the Givens rotations");
-    //     return givens;
-    // }
+    /// return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
+    /*static std::vector<GivensRot<>> GivensRotForMatrix(arma::mat const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10)
+    {
+        using namespace arma;
+        arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
+        std::vector<GivensRot<>> gs;
+        arma::mat evec;
+        arma::vec eval;
+        auto evalRef=conv_to<std::vector<double>>::from( eig_sym(cc1) );
+        size_t d=blockSize;
+        for(auto p2=cc1.n_rows-1; p2>0u; p2--) {
+            size_t p1= (p2+1>d) ? p2+1-d : 0u ;
+            arma::mat cc2=cc1.submat(p1,p1,p2,p2);
+            arma::eig_sym(eval,evec,cc2);
+            // select the less active
+            auto [i0,j0]=bestMatching(conv_to<std::vector<double>>::from(eval), evalRef);
+            evalRef.erase(evalRef.begin()+j0);
+            arma::vec v=evec.col(i0);
+            if (1-std::abs(v.back())<tolEvec) continue; // already done
+            std::vector<GivensRot<>> gs1;
+            for(auto i=0u; i+1<v.size(); i++)
+            {
+                auto b=i+p1;
+                auto g=GivensRot<>::createFromPair(b,v[i],v[i+1]);
+                gs1.push_back(g);
+                v[i+1]=g.r;
+            }
+            auto rot1=matrot_from_Givens(gs1);
+            cc1.submat(0,0,p2,p2)=rot1*cc1.submat(0,0,p2,p2)*rot1.t();
+            for(auto g : gs1) { g.b+=nExclude; gs.push_back(g); }
+        }
+        return gs;
+    }
+    */
+
+    /// return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
+    /// the first column of the rotation will go to pos0,
+    /// the second to pos0+1, and so on.
+    template<class T>
+    static std::vector<GivensRot<T>> GivensRotForRot_left(arma::Mat<T> rot, int pos0)
+    {
+        if (pos0+rot.n_cols>rot.n_rows) throw std::invalid_argument("GivensRotForRot: position outside the matrix");
+        using namespace arma;
+        std::vector<GivensRot<T>> givens;
+        for(auto j=0u; j<rot.n_cols; j++) {
+            arma::Col<T> v=rot.col(j);
+            std::vector<GivensRot<T>> gs1;
+            for(auto i=0u; i+1<=p2; i++)
+            {
+                auto g=GivensRot<T>::createFromPair(i,v[i],v[i+1], false);
+                gs1.push_back(g);
+                v[i+1]=g.r;
+            }
+            auto rot1=matrot_from_Givens(gs1);
+            rot.rows(0,p2)=rot1*rot.rows(0,p2);
+            for(auto g : gs1) givens.push_back(g);
+        }
+        // rot.clean(1e-15).print("rot after extracting the Givens rotations");
+        return givens;
+    }
+
+    /// return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
+    /// the first column of the rotation will go to pos0,
+    /// the second to pos0-1, and so on.
+    template<class T>
+    static std::vector<GivensRot<T>> GivensRotForRot_right(arma::Mat<T> rot, int pos0)
+    {
+        if (pos0 >= rot.n_cols) throw std::invalid_argument("GivensRotForRot: position outside the matrix");
+        using namespace arma;
+        std::vector<GivensRot<T>> givens;
+        for(auto p2=rot.n_cols-1; p2>0u; p2--) {
+            arma::Col<T> v=rot.col(p2);
+            std::vector<GivensRot<T>> gs1;
+            for(auto i=0u; i+1<=p2; i++)
+            {
+                auto g=GivensRot<T>::createFromPair(i,v[i],v[i+1], true);
+                gs1.push_back(g);
+                v[i+1]=g.r;
+            }
+            auto rot1=matrot_from_Givens(gs1);
+            rot.rows(0,p2)=rot1*rot.rows(0,p2);
+            for(auto g : gs1) givens.push_back(g);
+        }
+        // rot.clean(1e-15).print("rot after extracting the Givens rotations");
+        return givens;
+    }
 
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
     template<class T>
