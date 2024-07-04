@@ -235,31 +235,6 @@ struct Fermionic {
     }
     */
 
-    /// return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
-    /// the first column of the rotation will go to pos0,
-    /// the second to pos0+1, and so on.
-    template<class T>
-    static std::vector<GivensRot<T>> GivensRotForRot_left(arma::Mat<T> rot, int pos0)
-    {
-        if (pos0+rot.n_cols>rot.n_rows) throw std::invalid_argument("GivensRotForRot: position outside the matrix");
-        using namespace arma;
-        std::vector<GivensRot<T>> givens;
-        for(auto j=0u; j<rot.n_cols; j++) {
-            arma::Col<T> v=rot.col(j);
-            std::vector<GivensRot<T>> gs1;
-            for(auto i=0u; i+1<=p2; i++)
-            {
-                auto g=GivensRot<T>::createFromPair(i,v[i],v[i+1], false);
-                gs1.push_back(g);
-                v[i+1]=g.r;
-            }
-            auto rot1=matrot_from_Givens(gs1);
-            rot.rows(0,p2)=rot1*rot.rows(0,p2);
-            for(auto g : gs1) givens.push_back(g);
-        }
-        // rot.clean(1e-15).print("rot after extracting the Givens rotations");
-        return givens;
-    }
 
     /// return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
     /// the first column of the rotation will go to pos0,

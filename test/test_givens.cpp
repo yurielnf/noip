@@ -135,3 +135,15 @@ TEST_CASE( "GivensRotation complex" )
         REQUIRE(std::abs(Arot(1,2)/norm(A))<tol);
     }
 }
+
+
+TEST_CASE("set of Givens")
+{
+    arma::mat X(5,8, fill::randu), U, V;
+    vec s;
+    svd_econ(U,s,V,X);
+    s.print("s");
+    V.print("V");
+    auto givens=GivensRotForRot_left(V,0);
+    matrot_from_Givens(givens).t().eval().print("givens");
+}

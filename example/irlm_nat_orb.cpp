@@ -263,6 +263,13 @@ int main(int argc, char **argv)
         cc=Fermionic::cc_matrix(psi, sol.hamsys.sites)* cx_double(1,0);
         cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
+        {// the circuit to extract f orbitals
+            matriz kin=rot.t()*K*rot;
+            vec s;
+            matriz U,V;
+            svd_econ(U,s,V,kin.submat(0,0,nImpIp-1,len-1));
+            auto givens=GivensRotForRot_left<matriz::value_type>(V.cols(0,nImpIp-1), nImpIp);
+        }
         if (std::abs(i*dt-std::round(i*dt/circuit_dt)*circuit_dt) < 0.5*dt) {        
             auto givens=Fermionic::NOGivensRot(cc,circuit_nImp,circuit_nSite);
 //            auto givens=Fermionic::GivensRotForMatrix(cc,circuit_nImp,20);
