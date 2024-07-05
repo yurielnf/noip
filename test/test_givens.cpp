@@ -193,12 +193,12 @@ TEST_CASE("set of Givens")
         arma::cx_mat kin= cx_mat(3,2,fill::randu)*
                 cx_mat(2,len, fill::randu), U, V;
         vec s;
-        svd_econ(U,s,V,kin);
+        svd_econ(U,s,V,conj(kin));
         auto givens=GivensRotForRot_left(V.cols(0,1).eval());
         auto rot1=matrot_from_Givens(givens,V.n_rows);
         rot1.print("rot1");
         kin.print("kin");
-        (kin*rot1.t()).eval().clean(1e-15).print("kin after rot f");
+        (kin*rot1.st()).eval().clean(1e-15).print("kin after rot f");
     }
 
 }
