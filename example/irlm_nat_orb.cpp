@@ -268,7 +268,9 @@ int main(int argc, char **argv)
             vec s;
             matriz U,V;
             svd_econ(U,s,V,kin.submat(0,0,nImpIp-1,len-1));
-            auto givens=GivensRotForRot_left<matriz::value_type>(V.cols(0,nImpIp-1), nImpIp);
+            auto givens=GivensRotForRot_left<matriz::value_type>(V.cols(0,0)/*, nImpIp*/);
+            auto rot1=matrot_from_Givens(givens,V.n_rows);
+            (rot1*kin*rot1.t()).eval().clean(1e-15).print("kin after rot f");
         }
         if (std::abs(i*dt-std::round(i*dt/circuit_dt)*circuit_dt) < 0.5*dt) {        
             auto givens=Fermionic::NOGivensRot(cc,circuit_nImp,circuit_nSite);

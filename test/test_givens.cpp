@@ -38,11 +38,10 @@ TEST_CASE( "GivensRotation real" )
         for(auto i=0u; i+1<v.size(); i++)
         {
             auto b=i;
-            auto g=GivensRot<>::createFromPair(b,v[i],v[i+1], true);
+            auto g=GivensRot<>::createFromPair(b,v[i],v[i+1], true, &v[i+1]);
             gs.push_back(g);
-            v[i+1]=g.r;
         }
-        auto rot=matrot_from_Givens(gs);
+        auto rot=matrot_from_Givens(gs, v.size());
         vec y=rot*vc;
         REQUIRE(std::abs(norm(y)/norm(vc)-1)<tol);
         REQUIRE(std::abs(y[0]/y[2])<tol);
@@ -60,11 +59,10 @@ TEST_CASE( "GivensRotation real" )
         for(auto i=0u; i+1<v.size(); i++)
         {
             auto b=i;
-            auto g=GivensRot<>::createFromPair(b,v[i],v[i+1], true);
+            auto g=GivensRot<>::createFromPair(b,v[i],v[i+1], true, &v[i+1]);
             gs.push_back(g);
-            v[i+1]=g.r;
         }
-        auto rot=matrot_from_Givens(gs);
+        auto rot=matrot_from_Givens(gs,A.n_cols);
         REQUIRE(norm(rot*rot.t()-eye(size(rot)))<tol);
         arma::mat Arot=rot*A*rot.t();
         REQUIRE(std::abs(Arot(2,2)/eval(0)-1)<tol*norm(A));
@@ -100,11 +98,10 @@ TEST_CASE( "GivensRotation complex" )
         for(auto i=0u; i+1<v.size(); i++)
         {
             auto b=i;
-            auto g=GivensRot<cmpx>::createFromPair(b,v[i],v[i+1], true);
+            auto g=GivensRot<cmpx>::createFromPair(b,v[i],v[i+1], true, &v[i+1]);
             gs.push_back(g);
-            v[i+1]=g.r;
         }
-        auto rot=matrot_from_Givens(gs);
+        auto rot=matrot_from_Givens(gs, v.size());
         cx_vec y=rot*vc;
         REQUIRE(std::abs(norm(y)/norm(vc)-1)<tol);
         REQUIRE(std::abs(y[0]/y[2])<tol);
@@ -122,11 +119,10 @@ TEST_CASE( "GivensRotation complex" )
         for(auto i=0u; i+1<v.size(); i++)
         {
             auto b=i;
-            auto g=GivensRot<cmpx>::createFromPair(b,v[i],v[i+1],true);
+            auto g=GivensRot<cmpx>::createFromPair(b,v[i],v[i+1],true, &v[i+1]);
             gs.push_back(g);
-            v[i+1]=g.r;
         }
-        auto rot=matrot_from_Givens(gs);
+        auto rot=matrot_from_Givens(gs,A.n_cols);
         REQUIRE(norm(rot*rot.t()-eye(size(rot)))<tol);
         REQUIRE(norm(rot.t()*rot-eye(size(rot)))<tol);
         arma::cx_mat Arot=rot*A*rot.t();
@@ -137,13 +133,72 @@ TEST_CASE( "GivensRotation complex" )
 }
 
 
+TEST_CASE( "GivensRotation complex left" )
+{
+    double tol=1e-14;
+    cx_vec v(2, fill::randu);
+    auto g=GivensRot<cmpx>::createFromPair(0, v[0], v[1], false);
+
+    SECTION( "definition" )
+    {
+        cx_vec y=g.matrix()*v;
+        REQUIRE(std::abs(arma::norm(y)/arma::norm(v)-1)<tol);
+        REQUIRE(std::abs(y[1]/y[0])<tol);
+    }
+
+    SECTION("ilogmat")
+    {
+        cx_mat h=g.ilogMatrix();
+        REQUIRE(norm(h-h.t())<tol);
+        REQUIRE(norm(g.matrix()-expIH(h))<tol);
+    }
+
+    SECTION("3d case")
+    {
+        vector<GivensRot<cmpx>> gs;
+        arma::cx_vec v(3,fill::randu), vc=v;
+        for(int i=v.size()-2; i>=0; i--)
+        {
+            auto b=i;
+            auto g=GivensRot<cmpx>::createFromPair(b,v[i],v[i+1], false, &v[i]);
+            gs.push_back(g);
+        }
+        auto rot=matrot_from_Givens(gs, v.size());
+        cx_vec y=rot*vc;
+        REQUIRE(std::abs(norm(y)/norm(vc)-1)<tol);
+        REQUIRE(std::abs(y[2]/y[0])<tol);
+        REQUIRE(std::abs(y[1]/y[0])<tol);
+    }
+}
+
 TEST_CASE("set of Givens")
 {
-    arma::mat X(5,8, fill::randu), U, V;
-    vec s;
-    svd_econ(U,s,V,X);
-    s.print("s");
-    V.print("V");
-    auto givens=GivensRotForRot_left(V,0);
-    matrot_from_Givens(givens).t().eval().print("givens");
+    SECTION("basic")
+    {
+        arma::cx_mat X(5,5, fill::randu), U, V;
+        vec s;
+        svd(U,s,V,X);
+        //s.print("s");
+        //V.print("V");
+        // auto givens=GivensRotForRot_right(V,V.n_cols-1);
+        auto givens=GivensRotForRot_left(V.head_cols(5).eval());
+        auto G=matrot_from_Givens(givens,V.n_rows).t().eval();
+        //G.print("givens");
+        //cout<<norm(G.t()*G-eye<decltype(X)>(size(V)))<<endl;
+    }
+
+    SECTION("kin")
+    {
+        int len=5;
+        arma::cx_mat kin= cx_mat(3,2,fill::randu)*
+                cx_mat(2,len, fill::randu), U, V;
+        vec s;
+        svd_econ(U,s,V,kin);
+        auto givens=GivensRotForRot_left(V.cols(0,1).eval());
+        auto rot1=matrot_from_Givens(givens,V.n_rows);
+        rot1.print("rot1");
+        kin.print("kin");
+        (kin*rot1.t()).eval().clean(1e-15).print("kin after rot f");
+    }
+
 }

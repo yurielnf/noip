@@ -44,12 +44,12 @@ struct GivensRot {
     using matrix22=typename arma::Mat<T>::template fixed<2,2>;
 
     size_t b;     ///< bond b --- b+1
-    T c=1, s=0, r=1;  ///< cos, sin, radius
+    T c=1, s=0;  ///< cos, sin, radius
 
     //GivensRot(size_t b_) : b(b_) {}
 
     /// build the J s.t.  J * (p,q)=(0,r) is go_right=true. Adapted from eigen.tuxfamily.org
-    static GivensRot<T> createFromPair(size_t b, T p,  T q, bool go_right);
+    static GivensRot<T> createFromPair(size_t b, T p,  T q, bool go_right, T* r=nullptr);
 
     //double angle() const { return atan2(s,c); }
 
@@ -64,12 +64,15 @@ struct GivensRot {
         return evec * arma::diagmat(eval2) * evec.t();
     }
 
+    /// assuming that |z|=1 ??
+    GivensRot<cmpx> operator*(cmpx z) const { GivensRot<cmpx> g{.b=b}; g.c=c*z; g.s=s*z; return g;}
+
     //void transposeInPlace() {s=-s;}
 };
 
 
 template<>
-GivensRot<double> GivensRot<double>::createFromPair(size_t b, double p,  double q, bool go_right)
+GivensRot<double> GivensRot<double>::createFromPair(size_t b, double p,  double q, bool go_right, double *r)
 {
     using Scalar=double;
     using std::sqrt;
@@ -81,13 +84,13 @@ GivensRot<double> GivensRot<double>::createFromPair(size_t b, double p,  double 
     {
         g.c = p<Scalar(0) ? Scalar(-1) : Scalar(1);
         g.s = Scalar(0);
-        g.r = abs(p);
+        if (r) *r = abs(p);
     }
     else if(p==Scalar(0))
     {
         g.c = Scalar(0);
         g.s = q<Scalar(0) ? Scalar(1) : Scalar(-1);
-        g.r = abs(q);
+        if (r) *r = abs(q);
     }
     else if(abs(p) > abs(q))
     {
@@ -97,7 +100,7 @@ GivensRot<double> GivensRot<double>::createFromPair(size_t b, double p,  double 
             u = -u;
         g.c = Scalar(1)/u;
         g.s = -t * g.c;
-        g.r = p * u;
+        if (r) *r = p * u;
     }
     else
     {
@@ -107,7 +110,7 @@ GivensRot<double> GivensRot<double>::createFromPair(size_t b, double p,  double 
             u = -u;
         g.s = -Scalar(1)/u;
         g.c = -t * g.s;
-        g.r = q * u;
+        if (r) *r = q * u;
     }
     if (go_right) { g.s=-g.s; }
     return g;
@@ -117,7 +120,7 @@ template<>
 GivensRot<double>::matrix22 GivensRot<double>::matrix() const { return {{c, -s},{s, c}}; }
 
 template<>
-GivensRot<cmpx> GivensRot<cmpx>::createFromPair(size_t b, cmpx p, cmpx q, bool go_right)
+GivensRot<cmpx> GivensRot<cmpx>::createFromPair(size_t b, cmpx p, cmpx q, bool go_right, cmpx *r)
 {
     using Scalar=cmpx;
     using RealScalar=double;
@@ -131,13 +134,13 @@ GivensRot<cmpx> GivensRot<cmpx>::createFromPair(size_t b, cmpx p, cmpx q, bool g
     {
         g.c = std::real(p)<0 ? Scalar(-1) : Scalar(1);
         g.s = 0;
-        g.r = g.c * p;
+        if (r) *r = g.c * p;
     }
     else if(p==Scalar(0))
     {
         g.c = 0;
         g.s = -q/abs(q);
-        g.r = abs(q);
+        if (r) *r = abs(q);
     }
     else
     {
@@ -156,7 +159,7 @@ GivensRot<cmpx> GivensRot<cmpx>::createFromPair(size_t b, cmpx p, cmpx q, bool g
 
             g.c = Scalar(1)/u;
             g.s = -qs*conj(ps)*(g.c/p2);
-            g.r = p * u;
+            if (r) *r = p * u;
         }
         else
         {
@@ -173,7 +176,7 @@ GivensRot<cmpx> GivensRot<cmpx>::createFromPair(size_t b, cmpx p, cmpx q, bool g
             ps = p/p1;
             g.c = p1/u;
             g.s = -conj(ps) * (q/u);
-            g.r = ps * u;
+            if (r) *r = ps * u;
         }
     }
     if (go_right) { g.s=-conj(g.s); } // assuming g.c is real!!
@@ -186,7 +189,7 @@ GivensRot<cmpx>::matrix22 GivensRot<cmpx>::matrix() const { return {{std::conj(c
 
 
 template<class T>
-arma::Mat<T> matrot_from_Givens(std::vector<GivensRot<T>> const& gates, size_t n=0)
+arma::Mat<T> matrot_from_Givens(std::vector<GivensRot<T>> const& gates, size_t n)
 {
     if (n==0) {
         for(const GivensRot<T>& g : gates) if (g.b>n) n=g.b;
@@ -208,9 +211,9 @@ arma::Mat<T> matrot_from_Givens(std::vector<GivensRot<T>> const& gates, size_t n
 /// the first column of the rotation will go to pos0,
 /// the second to pos0+1, and so on.
 template<class T>
-static std::vector<GivensRot<T>> GivensRotForRot_left(arma::Mat<T> rot, int pos0)
+static std::vector<GivensRot<T>> GivensRotForRot_left(arma::Mat<T> rot)
 {
-    if (pos0+rot.n_cols>rot.n_rows) throw std::invalid_argument("GivensRotForRot: position outside the matrix");
+    //if (pos0+rot.n_cols>rot.n_rows) throw std::invalid_argument("GivensRotForRot: position outside the matrix");
     using namespace arma;
     std::vector<GivensRot<T>> givens;
     for(int j=0u; j<rot.n_cols; j++) {
@@ -218,18 +221,24 @@ static std::vector<GivensRot<T>> GivensRotForRot_left(arma::Mat<T> rot, int pos0
         std::vector<GivensRot<T>> gs1;
         for(int i=v.size()-2; i>=j; i--)
         {
-            auto g=GivensRot<T>::createFromPair(pos0+i,v[i],v[i+1], false);
+            auto g=GivensRot<T>::createFromPair(i,v[i],v[i+1], false, &v[i]);
             gs1.push_back(g);
-            v[i]=g.r;
         }
+        // if constexpr (std::is_same_v<cmpx,T>)
+        //         if (!gs1.empty())
+        //             gs1.back()=gs1.back()*v[j]; // to remove the phase
         auto rot1=matrot_from_Givens(gs1, rot.n_rows);
-        rot.cols(j,rot.n_cols-1) = rot1*rot.cols(j,rot.n_cols-1); // could start from j+1
+        arma::Mat<T> rotn = rot1*rot; //.cols(j,rot.n_cols-1) could start from j+1
+        rot=rotn;
         for(auto g : gs1) givens.push_back(g);
+
+
+        // v.clean(1e-15).print("v");
+        // rot.clean(1e-15).print("rot");
+        // rot1.clean(1e-15).print("rot1");
     }
-    rot.clean(1e-15).print("rot after extracting the Givens rotations");
+    //rot.clean(1e-15).print("rot after extracting the Givens rotations");
     return givens;
 }
-
-
 
 #endif // GIVENS_ROTATION_H
