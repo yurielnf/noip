@@ -189,16 +189,17 @@ TEST_CASE("set of Givens")
 
     SECTION("kin")
     {
-        int len=5;
-        arma::cx_mat kin= cx_mat(3,2,fill::randu)*
-                cx_mat(2,len, fill::randu), U, V;
+        int len=8;
+        cx_mat x(len,len,fill::randu), U, V, rot(len,len,fill::eye);
+        auto kin= (x.t()*x).eval();
+        kin.submat(2,2,len-1,len-1).fill(0);
+        auto k12=conj(kin.submat(0,2,1,len-1).eval());
         vec s;
-        svd_econ(U,s,V,conj(kin));
-        auto givens=GivensRotForRot_left(V.cols(0,1).eval());
-        auto rot1=matrot_from_Givens(givens,V.n_rows);
-        rot1.print("rot1");
+        svd_econ(U,s,V,k12);
+        auto givens=GivensRotForRot_left(V.head_cols(2).eval());
+        rot.submat(2,2,len-1,len-1)=matrot_from_Givens(givens,V.n_rows);
         kin.print("kin");
-        (kin*rot1.st()).eval().clean(1e-15).print("kin after rot f");
+        (rot.st().t()*kin*rot.st()).eval().clean(1e-13).print("kin after rot f");
     }
 
 }

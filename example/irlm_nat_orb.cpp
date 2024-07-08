@@ -242,10 +242,34 @@ int main(int argc, char **argv)
                                     {"activity", active.size()},
                                     {"none", len}
                                    }.at(j.at("ip").at("type"));
-        auto sys2 = model2_ip.HamIP(rot,nImpIp,dt);
-        if (nImpIp!=len) rot = rot * model2_ip.rotIP(rot,nImpIp,dt);
+        auto [sys2,givens] = model2_ip.HamIP_f(rot,nImpIp,dt);
+        if (nImpIp!=len) rot = rot * model2_ip.rotIP(rot,nImpIp,dt) * matrot_from_Givens(givens,len).st();
         cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
+
+        {// the circuit to extract f orbitals
+            // auto rot1=matrot_from_Givens(givens,len);
+            // auto gates=Fermionic::NOGates(sys2.sites,givens);
+            // gateTEvol(gates,1,1,psi,{"Cutoff",1e-10,"Quiet",true, "DoNormalize",true});
+            // cout<<"circuit-f:"<<t0.sincemark()<<endl;
+            // t0.mark();
+
+            matriz kin=(rot.t()*K*rot);
+            kin.submat(nImpIp,nImpIp,len-1,len-1).fill(0);
+            matriz k12=kin.submat(0,nImpIp,nImpIp-1,len-1);
+            vec s;
+            matriz U,V;
+            svd_econ(U,s,V,arma::conj(k12));
+            int nSv=arma::find(s>1e-12*s[0]).eval().size();
+            givens=GivensRotForRot_left(V.head_cols(nSv).eval());
+            for(auto& g:givens) g.b+=nImpIp;
+            matriz rot1=matrot_from_Givens(givens,len);
+            rot = rot*rot1.st();
+            kin.print("kin");
+            (rot1.st().t()*kin*rot1.st()).eval().clean(1e-15).print("kin after rot f");
+            return 0;
+        }
+
         it_tdvp sol {sys2, psi};
         sol.dt={0,dt};
         sol.bond_dim=512;
@@ -263,15 +287,7 @@ int main(int argc, char **argv)
         cc=Fermionic::cc_matrix(psi, sol.hamsys.sites)* cx_double(1,0);
         cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
-        {// the circuit to extract f orbitals
-            matriz kin=rot.t()*K*rot;
-            vec s;
-            matriz U,V;
-            svd_econ(U,s,V,kin.submat(0,0,nImpIp-1,len-1));
-            auto givens=GivensRotForRot_left<matriz::value_type>(V.cols(0,0)/*, nImpIp*/);
-            auto rot1=matrot_from_Givens(givens,V.n_rows);
-            (rot1*kin*rot1.t()).eval().clean(1e-15).print("kin after rot f");
-        }
+
         if (std::abs(i*dt-std::round(i*dt/circuit_dt)*circuit_dt) < 0.5*dt) {        
             auto givens=Fermionic::NOGivensRot(cc,circuit_nImp,circuit_nSite);
 //            auto givens=Fermionic::GivensRotForMatrix(cc,circuit_nImp,20);
