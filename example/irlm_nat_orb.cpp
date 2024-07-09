@@ -248,26 +248,26 @@ int main(int argc, char **argv)
         t0.mark();
 
         {// the circuit to extract f orbitals
-            // auto rot1=matrot_from_Givens(givens,len);
-            // auto gates=Fermionic::NOGates(sys2.sites,givens);
-            // gateTEvol(gates,1,1,psi,{"Cutoff",1e-10,"Quiet",true, "DoNormalize",true});
-            // cout<<"circuit-f:"<<t0.sincemark()<<endl;
-            // t0.mark();
+            auto rot1=matrot_from_Givens(givens,len);
+            auto gates=Fermionic::NOGates(sys2.sites,givens);
+            gateTEvol(gates,1,1,psi,{"Cutoff",1e-10,"Quiet",true, "DoNormalize",true});
+            cout<<"circuit-f:"<<t0.sincemark()<<endl;
+            t0.mark();
 
-            matriz kin=(rot.t()*K*rot);
-            kin.submat(nImpIp,nImpIp,len-1,len-1).fill(0);
-            matriz k12=kin.submat(0,nImpIp,nImpIp-1,len-1);
-            vec s;
-            matriz U,V;
-            svd_econ(U,s,V,arma::conj(k12));
-            int nSv=arma::find(s>1e-12*s[0]).eval().size();
-            givens=GivensRotForRot_left(V.head_cols(nSv).eval());
-            for(auto& g:givens) g.b+=nImpIp;
-            matriz rot1=matrot_from_Givens(givens,len);
-            rot = rot*rot1.st();
-            kin.print("kin");
-            (rot1.st().t()*kin*rot1.st()).eval().clean(1e-15).print("kin after rot f");
-            return 0;
+            // matriz kin=(rot.t()*K*rot);
+            // kin.submat(nImpIp,nImpIp,len-1,len-1).fill(0);
+            // matriz k12=kin.submat(0,nImpIp,nImpIp-1,len-1);
+            // vec s;
+            // matriz U,V;
+            // svd_econ(U,s,V,arma::conj(k12));
+            // int nSv=arma::find(s>1e-12*s[0]).eval().size();
+            // auto givens=GivensRotForRot_left(V.head_cols(nSv).eval());
+            // for(auto& g:givens) g.b+=nImpIp;
+            // matriz rot1=matrot_from_Givens(givens,len);
+            // rot = rot*rot1.st();
+            // kin.print("kin");
+            // (rot1.st().t()*kin*rot1.st()).eval().clean(1e-15).print("kin after rot f");
+            // return 0;
         }
 
         it_tdvp sol {sys2, psi};
