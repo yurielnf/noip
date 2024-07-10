@@ -243,6 +243,7 @@ int main(int argc, char **argv)
                                     {"none", len}
                                    }.at(j.at("ip").at("type"));
         auto [sys2,givens] = model2_ip.HamIP_f(rot,nImpIp,dt);
+        psi.replaceSiteInds(sys2.sites.inds());
         if (nImpIp!=len) rot = rot * model2_ip.rotIP(rot,nImpIp,dt) * matrot_from_Givens(givens,len).st();
         cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
