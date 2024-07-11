@@ -284,9 +284,9 @@ int main(int argc, char **argv)
 
         {
             //Kip.clean(1e-13).print("Kip");
-            auto gates=model2_ip.TrotterGates(Kip,3,dt);
+            auto gates=model2_ip.TrotterGatesExp(Kip,3,dt);
             //Time evolve, overwriting psi when done
-            gateTEvol(gates,dt,dt,psi,{"Cutoff=",1e-12,"Silent=",true});
+            gateTEvol(gates,1,1,psi,{"Cutoff=",1e-12,"Silent=",true});
         }
 
         cout<<"tdvp time"<<t0.sincemark()<<endl;

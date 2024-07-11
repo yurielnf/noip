@@ -238,6 +238,65 @@ struct IRLM_ip {
         return gates;
     }
 
+    template<class T>
+    auto TrotterGatesExp(arma::Mat<T> const& Kip,int nTB,double dt) const
+    {
+        using namespace itensor;
+        using namespace arma;
+
+        mat22 Id(fill::eye),
+                N={{0,0},{0,1}},
+                C={{0,1},{0,0}},
+                Cdag=C.t();
+
+        auto to_itgate=[&](int i,cx_mat44 const& rot) {
+            int b=i+1;
+            auto s1 = itensor::dag(sites(b));
+            auto s2 = itensor::dag(sites(b+1));
+            auto s1p = prime(sites(b));
+            auto s2p = prime(sites(b+1));
+            itensor::ITensor hterm(s1,s2,s1p,s2p);
+            hterm.set(s1(1),s2(1),s1p(1),s2p(1), rot(0,0));
+            hterm.set(s1(2),s2(2),s1p(2),s2p(2), rot(3,3));
+            hterm.set(s1(2),s2(1),s1p(2),s2p(1), rot(1,1));
+            hterm.set(s1(2),s2(1),s1p(1),s2p(2), rot(1,2));
+            hterm.set(s1(1),s2(2),s1p(2),s2p(1), rot(2,1));
+            hterm.set(s1(1),s2(2),s1p(1),s2p(2), rot(2,2));
+            return BondGate(sites,b,b+1,hterm);
+        };
+
+        auto mykron=[](mat22 const& A,mat22 const& B) { return mat44 {kron(A,B)}; };
+
+        auto gates = std::vector<BondGate>();
+
+        //Create the gates exp(-i*tstep/2*hterm)
+        for(int i=0; i<nTB-1; ++i)
+        {
+            cx_mat44 hloc = Kip(i,i+1)*mykron(Cdag,C);
+            hloc += Kip(i+1,i)*mykron(C,Cdag);
+            hloc += Kip(i,i)*mykron(N,Id);
+            hloc += Kip(i+1,i+1)*mykron(Id,N);
+            if (i==0) hloc += T(irlm.U)*mykron(N,N);
+
+            cx_mat44 rot=expIH<T>(hloc * (0.5*dt));
+            gates.push_back(to_itgate(i,rot));
+        }
+        //Create the gates exp(-i*tstep/2*hterm) in reverse
+        for(int i = nTB-2; i>=0; --i)
+        {
+            cx_mat44 hloc = Kip(i,i+1)*mykron(Cdag,C);
+            hloc += Kip(i+1,i)*mykron(C,Cdag);
+            hloc += Kip(i,i)*mykron(N,Id);
+            hloc += Kip(i+1,i+1)*mykron(Id,N);
+            if (i==0) hloc += T(irlm.U)*mykron(N,N);
+
+            cx_mat44 rot=expIH<T>(hloc * (0.5*dt));
+            gates.push_back(to_itgate(i,rot));
+        }
+        return gates;
+    }
+
+
 };
 
 
