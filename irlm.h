@@ -168,9 +168,9 @@ struct IRLM_ip {
 
     /// return the HamSys and the list of Givens rotations.
     template<class T>
-    std::pair<HamSys, std::vector<GivensRot<T>> > HamIP_f(arma::Mat<T> const& rot, int nImp, double dt, double tolSv=1e-12) const
+    std::tuple<HamSys, std::vector<GivensRot<T>>, arma::Mat<T> > HamIP_f(arma::Mat<T> const& rot, int nImp, double dt, double tolSv=1e-12) const
     {
-        if (nImp==rot.n_rows) return {Ham(rot),{}};
+        if (nImp==rot.n_rows) return {Ham(rot),{},{}};
         arma::Mat<T> K0=rot.t()*K*rot;
         arma::cx_mat K1 = K0.submat(0, nImp, nImp-1, rot.n_rows-1) *
                            K0.submat(nImp,nImp,rot.n_rows-1, rot.n_rows-1) * arma::cx_double(0,-0.5*dt); //the commutator
@@ -201,7 +201,41 @@ struct IRLM_ip {
                 h += Kip(i,j),"Cdag",i+1,"C",j+1;
         auto mpo=itensor::toMPO(h);
         HamSys ham{sites,mpo,mpo};
-        return make_pair(ham, givens);
+        return make_tuple(ham, givens, Kip);
+    }
+
+    template<class T>
+    auto TrotterGates(arma::Mat<T> const& Kip,int nTB,double dt) const
+    {
+        using namespace itensor;
+
+        auto gates = std::vector<BondGate>();
+
+        //Create the gates exp(-i*tstep/2*hterm)
+        for(int b = 1; b <= nTB-1; ++b)
+        {
+            auto hterm = Kip(b-1,b)*op(sites,"Adag",b)*op(sites,"A",b+1);
+            hterm += Kip(b,b-1)*op(sites,"A",b)*op(sites,"Adag",b+1);
+            hterm += Kip(b-1,b-1)*op(sites,"N",b)*op(sites,"Id",b+1);
+            hterm += Kip(b,b)*op(sites,"Id",b)*op(sites,"N",b+1);
+            if (b==1) hterm += irlm.U*op(sites,"N",b)*op(sites,"N",b+1);
+
+            auto g = BondGate(sites,b,b+1,BondGate::tReal,dt/2.,hterm);
+            gates.push_back(g);
+        }
+        //Create the gates exp(-i*tstep/2*hterm) in reverse
+        for(int b = nTB-1; b >= 1; --b)
+        {
+            auto hterm = Kip(b-1,b)*op(sites,"Adag",b)*op(sites,"A",b+1);
+            hterm += Kip(b,b-1)*op(sites,"A",b)*op(sites,"Adag",b+1);
+            hterm += Kip(b-1,b-1)*op(sites,"N",b)*op(sites,"Id",b+1);
+            hterm += Kip(b,b)*op(sites,"Id",b)*op(sites,"N",b+1);
+            if (b==1) hterm += irlm.U*op(sites,"N",b)*op(sites,"N",b+1);
+
+            auto g = BondGate(sites,b,b+1,BondGate::tReal,dt/2.,hterm);
+            gates.push_back(g);
+        }
+        return gates;
     }
 
 };

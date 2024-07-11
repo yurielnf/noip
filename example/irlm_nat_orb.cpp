@@ -242,7 +242,7 @@ int main(int argc, char **argv)
                                     {"activity", active.size()},
                                     {"none", len}
                                    }.at(j.at("ip").at("type"));
-        auto [sys2,givens] = model2_ip.HamIP_f(rot,nImpIp,dt);
+        auto [sys2,givens,Kip] = model2_ip.HamIP_f(rot,nImpIp,dt);
         psi.replaceSiteInds(sys2.sites.inds());
         if (nImpIp!=len) rot = rot * model2_ip.rotIP(rot,nImpIp,dt) * matrot_from_Givens(givens,len).st();
         cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
@@ -271,30 +271,38 @@ int main(int argc, char **argv)
             // return 0;
         }
 
-        it_tdvp sol {sys2, psi};
-        sol.dt={0,dt};
-        sol.bond_dim=512;
-        sol.rho_cutoff=1e-14;
-        sol.silent=true;
-        sol.epsilonM=j.at("tdvp").at("epsilonM");
-        sol.nKrylov=j.at("tdvp").at("nKrylov");
-        sol.enrichByFit = false; //(i%10!=0);
+        // it_tdvp sol {sys2, psi};
+        // sol.dt={0,dt};
+        // sol.bond_dim=512;
+        // sol.rho_cutoff=1e-14;
+        // sol.silent=true;
+        // sol.epsilonM=j.at("tdvp").at("epsilonM");
+        // sol.nKrylov=j.at("tdvp").at("nKrylov");
+        // sol.enrichByFit = false; //(i%10!=0);
 
-        sol.iterate();
+        // sol.iterate();
+
+        {
+            //Kip.clean(1e-13).print("Kip");
+            auto gates=model2_ip.TrotterGates(Kip,3,dt);
+            //Time evolve, overwriting psi when done
+            gateTEvol(gates,dt,dt,psi,{"Cutoff=",1e-12,"Silent=",true});
+        }
+
         cout<<"tdvp time"<<t0.sincemark()<<endl;
         t0.mark();
 
-        psi=sol.psi;
-        cc=Fermionic::cc_matrix(psi, sol.hamsys.sites)* cx_double(1,0);
+        // psi=sol.psi;
+        cc=Fermionic::cc_matrix(psi, sys2.sites)* cx_double(1,0);
         cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
 
         if (std::abs(i*dt-std::round(i*dt/circuit_dt)*circuit_dt) < 0.5*dt) {        
-            auto givens=Fermionic::NOGivensRot(cc,circuit_nImp+1,circuit_nSite);
+            auto givens=Fermionic::NOGivensRot(cc,circuit_nImp,circuit_nSite);
 //            auto givens=Fermionic::GivensRotForMatrix(cc,circuit_nImp,20);
             auto rot1=matrot_from_Givens(givens,cc.n_rows);
             //real((rot1 * cc * rot1.t()).eval().clean(1e-10).submat(circuit_nImp,circuit_nImp,cc.n_rows-1,cc.n_cols-1)).print("rot1*cc*rot1.t()");
-            auto gates=Fermionic::NOGates(sol.hamsys.sites,givens);
+            auto gates=Fermionic::NOGates(sys2.sites,givens);
             gateTEvol(gates,1,1,psi,{"Cutoff",1e-10,"Quiet",true, "DoNormalize",true});
             cout<<"circuit1:"<<t0.sincemark()<<endl;
             t0.mark();
@@ -314,9 +322,9 @@ int main(int argc, char **argv)
         }
 
 
-        double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
-        cd=itensor::innerC(sol.psi, cdOp(sol.hamsys.sites), sol.psi).real();
-        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(psi)<<" "<<sol.energy<<" "<<n0<<" "<<cd<<" "<<active.size()<<endl;
+        double n0=itensor::expectC(psi, sys2.sites, "N",{1}).at(0).real();
+        cd=itensor::innerC(psi, cdOp(sys2.sites), psi).real();
+        out<<(i+1)*abs(dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(psi)<<" "<<0<<" "<<n0<<" "<<cd<<" "<<active.size()<<endl;
 
         if (i>0 && i%100==0) {
             cc.save("cc_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
