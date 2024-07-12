@@ -187,7 +187,7 @@ struct IRLM_ip {
             arma::Mat<T> U, V;
             svd_econ(U,s,V,arma::conj(k12));
             int nSv=arma::find(s>tolSv*s[0]).eval().size();
-            std::cout<<"nSV="<<nSv<<std::endl;
+            //std::cout<<"nSV="<<nSv<<std::endl;
             givens=GivensRotForRot_left(V.head_cols(nSv).eval());
             for(auto& g:givens) g.b+=nImp;
             arma::Mat<T> rot1=matrot_from_Givens(givens, rot.n_cols).st();

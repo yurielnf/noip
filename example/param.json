@@ -1,19 +1,21 @@
 {    
+    "verbose": false,
     "irlm": {
         "U": 0.0,
         "L": 24
     },
     "tdvp": {
-        "dt": 0.1,
+        "dt": 0.01,
         "nKrylov": 3,
         "epsilonM": 1e-7
     },
     "circuit": {
-        "dt": 0.1,
+        "dt": 0.01,
         "nSite": 40,
         "nImp": 2,
         "tolGs2": 1e-5,
-        "comment": "if nImp==-1 then it will be determined by the number of active orbitals in gs2 using tolgs2"
+        "comment": "if nImp==-1 then it will be determined by the number of active orbitals in gs2 using tolgs2",
+        "tol": 1e-13
     },
     "ip": {
         "type": "circuit",
