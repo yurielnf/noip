@@ -19,12 +19,12 @@ auto computeGS(HamSys const& sys)
 {
     cout<<"bond dimension of H: "<< maxLinkDim(sys.ham) << endl;
     it_dmrg sol_gs {sys};
-    sol_gs.bond_dim=512;
-    sol_gs.noise=1e-5;
+    sol_gs.bond_dim=64;
+    sol_gs.noise=1e-3;
     cout<<"\nsweep bond-dim energy\n";
     for(auto i=0u; i<30; i++) {
-        if (i==10) sol_gs.noise=1e-7;
-        else if (i==26) sol_gs.noise=1e-9;
+        if (i==10) { sol_gs.noise=1e-7; sol_gs.bond_dim=256; }
+        else if (i==26) { sol_gs.noise=1e-9; sol_gs.bond_dim=512; }
         else if (i==28) sol_gs.noise=0;
         if (false && i==11) {
             // Global subspace expansion
@@ -123,7 +123,6 @@ int main(int argc, char **argv)
     }
 
 
-    cout<<"irlm_nat_orb [len=20] [hamRestricted=1] [dt=0.1] [circuit_dt=0.1]"<<endl;
     bool verbose=j.at("verbose");
     int len=j.at("irlm").at("L"), nExclude=2;
     double U=j.at("irlm").at("U");
