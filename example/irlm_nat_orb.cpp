@@ -272,20 +272,25 @@ int main(int argc, char **argv)
             // return 0;
         }
 
-        // it_tdvp sol {sys2, psi};
-        // sol.dt={0,dt};
-        // sol.bond_dim=512;
-        // sol.rho_cutoff=1e-14;
-        // sol.silent=true;
-        // sol.epsilonM=j.at("tdvp").at("epsilonM");
-        // sol.nKrylov=j.at("tdvp").at("nKrylov");
-        // sol.enrichByFit = false; //(i%10!=0);
+        if (false) {// tdvp
+            it_tdvp sol {sys2, psi};
+            sol.dt={0,dt};
+            sol.bond_dim=512;
+            sol.rho_cutoff=1e-14;
+            sol.silent=true;
+            sol.epsilonM=j.at("tdvp").at("epsilonM");
+            sol.nKrylov=j.at("tdvp").at("nKrylov");
+            sol.enrichByFit = false; //(i%10!=0);
 
-        // sol.iterate();
+            sol.iterate();
+            psi=sol.psi;
+        }
 
-        {
+        if (true) {
             //Kip.clean(1e-13).print("Kip");
+            //cout<<"U="<<model2_ip.irlm.U<<endl;
             auto gates=model2_ip.TrotterGatesExp(Kip,3,dt);
+            // auto gates=model2_ip.TrotterGates(Kip,3,dt);
             //Time evolve, overwriting psi when done
             gateTEvol(gates,1,1,psi,{"Cutoff=",circuit_tol,"Quiet=",true, "DoNormalize",true,"ShowPercent",false});
         }
@@ -293,7 +298,7 @@ int main(int argc, char **argv)
         if (verbose) cout<<"tdvp time"<<t0.sincemark()<<endl;
         t0.mark();
 
-        // psi=sol.psi;
+
         cc=Fermionic::cc_matrix(psi, sys2.sites)* cx_double(1,0);
         if (verbose) cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();

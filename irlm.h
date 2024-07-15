@@ -214,10 +214,11 @@ struct IRLM_ip {
         //Create the gates exp(-i*tstep/2*hterm)
         for(int b = 1; b <= nTB-1; ++b)
         {
-            auto hterm = Kip(b-1,b)*op(sites,"Adag",b)*op(sites,"A",b+1);
-            hterm += Kip(b,b-1)*op(sites,"A",b)*op(sites,"Adag",b+1);
-            hterm += Kip(b-1,b-1)*op(sites,"N",b)*op(sites,"Id",b+1);
-            hterm += Kip(b,b)*op(sites,"Id",b)*op(sites,"N",b+1);
+            auto hterm =
+                     Kip(b-1,b  )*op(sites,"Adag",b) *op(sites,"A",b+1);
+            hterm += Kip(b,b-1  )*op(sites,"A",b)    *op(sites,"Adag",b+1);
+            hterm += Kip(b-1,b-1)*op(sites,"N",b)    *op(sites,"Id",b+1);
+           if (b==nTB-1) hterm += Kip(b,b    )*op(sites,"Id",b)   *op(sites,"N",b+1);
             if (b==1) hterm += irlm.U*op(sites,"N",b)*op(sites,"N",b+1);
 
             auto g = BondGate(sites,b,b+1,BondGate::tReal,dt/2.,hterm);
@@ -229,7 +230,7 @@ struct IRLM_ip {
             auto hterm = Kip(b-1,b)*op(sites,"Adag",b)*op(sites,"A",b+1);
             hterm += Kip(b,b-1)*op(sites,"A",b)*op(sites,"Adag",b+1);
             hterm += Kip(b-1,b-1)*op(sites,"N",b)*op(sites,"Id",b+1);
-            hterm += Kip(b,b)*op(sites,"Id",b)*op(sites,"N",b+1);
+            if (b==nTB-1) hterm += Kip(b,b)*op(sites,"Id",b)*op(sites,"N",b+1);
             if (b==1) hterm += irlm.U*op(sites,"N",b)*op(sites,"N",b+1);
 
             auto g = BondGate(sites,b,b+1,BondGate::tReal,dt/2.,hterm);
@@ -265,7 +266,7 @@ struct IRLM_ip {
             return BondGate(sites,b,b+1,hterm);
         };
 
-        auto mykron=[](mat22 const& A,mat22 const& B) { return mat44 {kron(A,B)}; };
+        auto mykron=[](mat22 const& A,mat22 const& B) { return mat44 {kron(B,A).st()}; };
 
         auto gates = std::vector<BondGate>();
 
@@ -275,7 +276,7 @@ struct IRLM_ip {
             cx_mat44 hloc = Kip(i,i+1)*mykron(Cdag,C);
             hloc += Kip(i+1,i)*mykron(C,Cdag);
             hloc += Kip(i,i)*mykron(N,Id);
-            hloc += Kip(i+1,i+1)*mykron(Id,N);
+            if (i==nTB-2) hloc += Kip(i+1,i+1)*mykron(Id,N);
             if (i==0) hloc += T(irlm.U)*mykron(N,N);
 
             cx_mat44 rot=expIH<T>(hloc * (0.5*dt));
@@ -287,7 +288,7 @@ struct IRLM_ip {
             cx_mat44 hloc = Kip(i,i+1)*mykron(Cdag,C);
             hloc += Kip(i+1,i)*mykron(C,Cdag);
             hloc += Kip(i,i)*mykron(N,Id);
-            hloc += Kip(i+1,i+1)*mykron(Id,N);
+            if (i==nTB-2) hloc += Kip(i+1,i+1)*mykron(Id,N);
             if (i==0) hloc += T(irlm.U)*mykron(N,N);
 
             cx_mat44 rot=expIH<T>(hloc * (0.5*dt));
