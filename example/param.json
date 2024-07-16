@@ -6,8 +6,8 @@
     },
     "tdvp": {
         "dt": 0.01,
-        "nKrylov": 3,
-        "epsilonM": 1e-7
+        "nKrylov": 16,
+        "epsilonM": 1e-9
     },
     "circuit": {
         "dt": 0.01,
@@ -15,7 +15,7 @@
         "nImp": 2,
         "tolGs2": 1e-5,
         "comment": "if nImp==-1 then it will be determined by the number of active orbitals in gs2 using tolgs2",
-        "tol": 1e-13
+        "tol": 1e-12
     },
     "ip": {
         "type": "circuit",
