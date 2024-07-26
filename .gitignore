@@ -1,5 +1,5 @@
 build*
 CMakeLists.txt.user
 Makefile
-tdvp/notebook/data/
+notebook/data/
 .ipynb_checkpoints/
