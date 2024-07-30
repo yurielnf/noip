@@ -180,8 +180,48 @@ struct IRLM_ip {
         Kip.submat(0, nImp, nImp-1, rot.n_rows-1)+=K1;
         Kip.submat(nImp, 0, rot.n_rows-1, nImp-1)+=K1.t();
 
-        std::vector<GivensRot<T>> givens;
+        std::vector<GivensRot<T>> givens;   // TODO: Wannierize the subspace
         {// the circuit to extract f orbitals
+            auto k12=Kip.submat(0,nImp,nImp-1,rot.n_rows-1);
+            arma::vec s;
+            arma::Mat<T> U, V;
+            svd_econ(U,s,V,arma::conj(k12));
+            int nSv=arma::find(s>tolSv*s[0]).eval().size();
+            //std::cout<<"nSV="<<nSv<<std::endl;
+            givens=GivensRotForRot_left(V.head_cols(nSv).eval());
+            for(auto& g:givens) g.b+=nImp;
+            arma::Mat<T> rot1=matrot_from_Givens(givens, rot.n_cols).st();
+            Kip=(rot1.t()*Kip*rot1).eval();
+        }
+
+        auto h=hImp;
+        for(auto i=0; i<sites.length(); i++)
+            for(auto j=0; j<sites.length(); j++)
+            if (std::abs(Kip(i,j))>1e-15)
+                h += Kip(i,j),"Cdag",i+1,"C",j+1;
+        auto mpo=itensor::toMPO(h);
+        HamSys ham{sites,mpo,mpo};
+        return make_tuple(ham, givens, Kip);
+    }
+
+    /// return the HamSys and the list of Givens rotations to be applied to the state.
+    /// It implement the interaction picture for the Slater part only.
+    /// nImp is the number of active orbitals.
+    template<class T>
+    std::tuple<HamSys, std::vector<GivensRot<T>>, arma::Mat<T> > HamIPS(arma::Mat<T> const& rot, int nImp, double dt, bool extractf,double tolSv=1e-12) const
+    {
+        if (nImp==rot.n_rows) return {Ham(rot),{},{}};
+        arma::Mat<T> K0=rot.t()*K*rot;
+        arma::cx_mat K1 = K0.submat(0, nImp, nImp-1, rot.n_rows-1) *
+                           K0.submat(nImp,nImp,rot.n_rows-1, rot.n_rows-1) * arma::cx_double(0,+0.5*dt); //the commutator
+        arma::cx_mat Kip=K0 * arma::cx_double(1,0);
+        Kip.submat(nImp, nImp, rot.n_rows-1, rot.n_rows-1).fill(0.0);
+        Kip.submat(0,0,nImp-1,nImp-1)=K0.submat(0,0,nImp-1,nImp-1) * arma::cx_double(1,0);
+        Kip.submat(0, nImp, nImp-1, rot.n_rows-1)+=K1;
+        Kip.submat(nImp, 0, rot.n_rows-1, nImp-1)+=K1.t();
+
+        std::vector<GivensRot<T>> givens;
+        if (extractf){// the circuit to extract f orbitals
             auto k12=Kip.submat(0,nImp,nImp-1,rot.n_rows-1);
             arma::vec s;
             arma::Mat<T> U, V;

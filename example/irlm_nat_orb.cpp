@@ -236,20 +236,24 @@ int main(int argc, char **argv)
     arma::uvec active=arma::find(ni>tolActivity && ni<1-tolActivity);
     out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<" "<<cd<<" "<<active.size()<<endl;
     auto model2_ip=IRLM_ip{model2};
+    matriz Q(len,len,fill::eye);
+    MPS psi0=psi;
     for(auto i=0; i*dt<=len; i++) {
         if (verbose) cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         itensor::cpu_time t0;
         int nImpIp=map<string,int> {{"circuit", circuit_nImp},
-                                    {"activity", active.size()},
+                                    {"activity", std::max(circuit_nImp,(int)active.size())},
                                     {"none", len}
                                    }.at(j.at("ip").at("type"));
-        auto [sys2,givens,Kip] = model2_ip.HamIP_f(rot,nImpIp,dt);
+        // auto [sys2,givens,Kip] = model2_ip.HamIP_f(rot,nImpIp,dt);
+        auto [sys2,givens,Kip] = model2_ip.HamIPS(rot, nImpIp, dt, j.at("extract_f"));
         psi.replaceSiteInds(sys2.sites.inds());
-        if (nImpIp!=len) rot = rot * model2_ip.rotIP(rot,nImpIp,dt) * matrot_from_Givens(givens,len).st();
+        // if (nImpIp!=len) rot = rot * model2_ip.rotIP(rot,nImpIp,dt) * matrot_from_Givens(givens,len).st();
+        if (nImpIp!=len) { rot = rot * matrot_from_Givens(givens,len).st();  Q=Q*matrot_from_Givens(givens,len).st(); }
         if (verbose) cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
 
-        {// the circuit to extract f orbitals
+        if (j.at("extract_f")) {// the circuit to extract f orbitals
             auto rot1=matrot_from_Givens(givens,len);
             auto gates=Fermionic::NOGates(sys2.sites,givens);
             gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "DoNormalize",true,"ShowPercent",false});
@@ -272,7 +276,7 @@ int main(int argc, char **argv)
             // return 0;
         }
 
-        if (false) {// tdvp
+        if (j.at("use_tdvp")) {// tdvp
             it_tdvp sol {sys2, psi};
             sol.dt={0,dt};
             sol.bond_dim=512;
@@ -313,7 +317,7 @@ int main(int argc, char **argv)
             t0.mark();
             //matriz ccr=Fermionic::cc_matrix(psi, sol.hamsys.sites);
             //real(ccr.clean(1e-7).submat(circuit_nImp,circuit_nImp,cc.n_rows-1,cc.n_cols-1)).print("cc after rot");
-            rot = rot*rot1.st();
+            rot = rot*rot1.st(); Q=Q*rot1.st();
             cc=rot1*cc*rot1.t();
             //psi.orthogonalize({"Cutoff",circuit_tol});
             vec ni=arma::real(cc.diag());
@@ -323,6 +327,16 @@ int main(int argc, char **argv)
                 cout<<"active: "<<active.size()<<endl;
                 for(auto i=0; i<psi.length(); i++)
                     cout<<itensor::leftLinkIndex(psi,i+1).dim()<<" ";
+                cout<<endl;
+            }
+
+            {// exp(Q) applied to psi0
+                psi0.replaceSiteInds(sys2.sites.inds());
+                gateTEvol(gates,1,1,psi0,{"Cutoff",1e-4,"Quiet",true, "DoNormalize",true,"ShowPercent",true});
+                cout<<"\noverlap="<<itensor::innerC(psi0,psi)<<endl;
+
+                for(auto i=0; i<psi0.length(); i++)
+                    cout<<itensor::leftLinkIndex(psi0,i+1).dim()<<" ";
                 cout<<endl;
             }
         }
@@ -336,6 +350,22 @@ int main(int argc, char **argv)
             cc.save("cc_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
             rot.save("orb_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
             //exportPsi(psi,"psi_t"s+to_string(i)+".txt");
+        }
+
+        if (i>0 && i%100==0) {
+            // auto givens=GivensRotForRot_left(Q);
+            // auto gates=Fermionic::NOGates(sys2.sites,givens);
+            // MPS psi2=psi0;
+            // psi2.replaceSiteInds(sys2.sites.inds());
+            // gateTEvol(gates,1,1,psi2,{"Cutoff",1e-4,"Quiet",true, "DoNormalize",true,"ShowPercent",true});
+            // cout<<"\noverlap="<<itensor::innerC(psi2,psi)<<endl;
+
+            // for(auto i=0; i<psi2.length(); i++)
+            //     cout<<itensor::leftLinkIndex(psi2,i+1).dim()<<" ";
+            // cout<<endl;
+
+            Q=eye<matriz>(len,len);
+            psi0=psi;
         }
     }
 
