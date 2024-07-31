@@ -23,5 +23,9 @@
         "type": "activity",
         "tolActivity": 1e-10,
         "comment": "type can be one of {none,circuit,activity} meaning {don't use ip, use circuit.nImp, use instantaneous active orbitals}"
+    },
+    "green": {
+        "t0": 0,
+        "greater": true
     }
 }

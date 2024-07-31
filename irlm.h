@@ -105,9 +105,9 @@ struct IRLM_ip {
     itensor::AutoMPO hImp;
     arma::mat K;
 
-    explicit IRLM_ip(const IRLM& irlm_)
+    explicit IRLM_ip(itensor::Fermion sites_, const IRLM& irlm_)
         : irlm(irlm_)
-        , sites(irlm_.L, {"ConserveNf",true})
+        , sites(sites_)
         , hImp (sites)
     {
         arma::mat Umat;

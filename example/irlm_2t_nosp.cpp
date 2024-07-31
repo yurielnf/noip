@@ -150,7 +150,7 @@ int main(int argc, char **argv)
     cout<<"\n-------------------------- rotate the H to natural orbitals: find the gs again ----------------\n";
 
     double tolGs2=j.at("circuit").at("tolGs2");
-    {        
+    {
         matriz kin=rot.t()*K*rot;
         matriz rot1p=MagicRotation<matriz::value_type>(cc.submat(nExclude,nExclude,len-1,len-1),
                                            kin.submat(nExclude,nExclude,len-1,len-1),
@@ -186,7 +186,7 @@ int main(int argc, char **argv)
     cout<<"\nNumber of active orbitals of the future gs, tol: "<<circuit_nImp<<", "<<tolGs2<<endl;
 
     cout<<"\n-------------------------- find the gs1 in NO2 ----------------\n";
-    {        
+    {
         matriz kin=rot.t()*K*rot;
         matriz rot1p=MagicRotation<matriz::value_type>(cc.submat(circuit_nImp,circuit_nImp,len-1,len-1),
                                       kin.submat(circuit_nImp,circuit_nImp,len-1,len-1),
@@ -220,35 +220,28 @@ int main(int argc, char **argv)
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n"; cout.flush();
     double dt=j.at("tdvp").at("dt");
+    double t0=j.at("green").at("t0");
+    bool greater=j.at("green").at("greater");
     double tolActivity=j.at("ip").at("tolActivity");
     auto psi=sol1b.psi;
 
-    ofstream out("irlm_no_L"s+to_string(len)+".txt");
-    out<<"time M m energy n0 cd nActive\n"<<setprecision(14);
-    double n0=itensor::expectC(psi, sol1b.hamsys.sites, "N",{1}).at(0).real();
-    auto cdOp=[&](itensor::Fermion const& sites) {
-        itensor::AutoMPO ampo(sites);
-        ampo += "Cdag",1,"C",2;
-        ampo += "Cdag",2,"C",1;
-        return itensor::toMPO(ampo);
-    };
-    double cd=itensor::innerC(psi, cdOp(sol1b.hamsys.sites), psi).real();
+    ofstream out("irlm_no_green_L"s+to_string(len)+".txt");
+    out<<"time mBra mKet green nActiveBra nActiveKet\n"<<setprecision(14);
     vec ni=arma::real(cc.diag());
-    arma::uvec active=arma::find(ni>tolActivity && ni<1-tolActivity);
-    out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<" "<<cd<<" "<<active.size()<<endl;
-    auto model2_ip=IRLM_ip{model2};
-    for(auto i=0; i*dt<=len; i++) {
-        if (verbose) cout<<"-------------------------- iteration "<<i+1<<" --------\n";
+    int nActive=arma::find(ni>tolActivity && ni<1-tolActivity).eval().size();
+    auto model2_ip=IRLM_ip {model2};
+
+    auto evolve=[&](MPS &psi, matriz &rot, int nActive,double dt) {
         itensor::cpu_time t0;
         int nImpIp=map<string,int> {{"circuit", circuit_nImp},
-                                    {"activity", std::max(circuit_nImp,(int)active.size())},
+                                    {"activity", std::max(circuit_nImp,nActive)},
                                     {"none", len}
                                    }.at(j.at("ip").at("type"));
         // auto [sys2,givens,Kip] = model2_ip.HamIP_f(rot,nImpIp,dt);
         auto [sys2,givens,Kip] = model2_ip.HamIPS(rot, nImpIp, dt, j.at("extract_f"));
         psi.replaceSiteInds(sys2.sites.inds());
         // if (nImpIp!=len) rot = rot * model2_ip.rotIP(rot,nImpIp,dt) * matrot_from_Givens(givens,len).st();
-        if (nImpIp!=len) { rot = rot * matrot_from_Givens(givens,len).st();  }
+        if (nImpIp!=len) { rot = rot * matrot_from_Givens(givens,len).st(); }
         if (verbose) cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
 
@@ -258,21 +251,6 @@ int main(int argc, char **argv)
             gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "DoNormalize",true,"ShowPercent",false});
             if (verbose) cout<<"circuit-f:"<<t0.sincemark()<<endl;
             t0.mark();
-
-            // matriz kin=(rot.t()*K*rot);
-            // kin.submat(nImpIp,nImpIp,len-1,len-1).fill(0);
-            // matriz k12=kin.submat(0,nImpIp,nImpIp-1,len-1);
-            // vec s;
-            // matriz U,V;
-            // svd_econ(U,s,V,arma::conj(k12));
-            // int nSv=arma::find(s>1e-12*s[0]).eval().size();
-            // auto givens=GivensRotForRot_left(V.head_cols(nSv).eval());
-            // for(auto& g:givens) g.b+=nImpIp;
-            // matriz rot1=matrot_from_Givens(givens,len);
-            // rot = rot*rot1.st();
-            // kin.print("kin");
-            // (rot1.st().t()*kin*rot1.st()).eval().clean(1e-15).print("kin after rot f");
-            // return 0;
         }
 
         if (j.at("use_tdvp")) {// tdvp
@@ -289,11 +267,7 @@ int main(int argc, char **argv)
             psi=sol.psi;
         }
         else {
-            //Kip.clean(1e-13).print("Kip");
-            //cout<<"U="<<model2_ip.irlm.U<<endl;
             auto gates=model2_ip.TrotterGatesExp(Kip,3,dt);
-            // auto gates=model2_ip.TrotterGates(Kip,3,dt);
-            //Time evolve, overwriting psi when done
             gateTEvol(gates,1,1,psi,{"Cutoff=",circuit_tol,"Quiet=",true, "DoNormalize",true,"ShowPercent",false});
         }
 
@@ -305,41 +279,68 @@ int main(int argc, char **argv)
         if (verbose) cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
 
-        if (std::abs(i*dt-std::round(i*dt/circuit_dt)*circuit_dt) < 0.5*dt) {        
+        if (true) {
             auto givens=Fermionic::NOGivensRot(cc,circuit_nImp,circuit_nSite);
 //            auto givens=Fermionic::GivensRotForMatrix(cc,circuit_nImp,20);
             auto rot1=matrot_from_Givens(givens,cc.n_rows);
-            //real((rot1 * cc * rot1.t()).eval().clean(1e-10).submat(circuit_nImp,circuit_nImp,cc.n_rows-1,cc.n_cols-1)).print("rot1*cc*rot1.t()");
             auto gates=Fermionic::NOGates(sys2.sites,givens);
             gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "DoNormalize",true,"ShowPercent",false});
             if (verbose) cout<<"circuit1:"<<t0.sincemark()<<endl;
             t0.mark();
-            //matriz ccr=Fermionic::cc_matrix(psi, sol.hamsys.sites);
-            //real(ccr.clean(1e-7).submat(circuit_nImp,circuit_nImp,cc.n_rows-1,cc.n_cols-1)).print("cc after rot");
             rot = rot*rot1.st();
             cc=rot1*cc*rot1.t();
-            //psi.orthogonalize({"Cutoff",circuit_tol});
             vec ni=arma::real(cc.diag());
-            active=arma::find(ni>tolActivity && ni<1-tolActivity);
+            nActive=arma::find(ni>tolActivity && ni<1-tolActivity).eval().size();
 
             if (verbose) {
-                cout<<"active: "<<active.size()<<endl;
+                cout<<"active: "<<nActive<<endl;
                 for(auto i=0; i<psi.length(); i++)
                     cout<<itensor::leftLinkIndex(psi,i+1).dim()<<" ";
                 cout<<endl;
-            }            
+            }
+        }
+        return make_tuple();
+    };
+
+
+    for(auto i=0; i*dt<t0; i++) {
+        evolve(psi,rot, nActive,dt);
+    }
+
+    //--------------------------------------------------- forward ---------------
+    MPS bra=psi, ket=psi;
+    matriz rotB=rot, rotK=rot;
+    int nActiveB=nActive, nActiveK=nActive;
+
+    {// apply the excitation
+        ket.position(1);
+        auto newA = op(sol1b.hamsys.sites, (greater ? "Adag": "A"), 1)* ket(1);
+        newA.noPrime();
+        ket.ref(1)=newA;
+    }
+
+    for(auto i=0; t0+i*dt<len; i++) {
+        if (verbose) cout<<"-------------------------- iteration "<<i+1<<" --------\n";
+        evolve(ket,rotK,nActiveK,dt);
+        evolve(bra,rotB,nActiveB,dt);
+
+        MPS ket2=ket;
+        {// apply the excitation
+            ket2.position(1);
+            auto newA = op(sites, (greater ? "A": "Adag"), 1)* ket2(1);
+            newA.noPrime();
+            ket2.ref(1)=newA;
         }
 
+        complex<double> g;
+        {// exp(Q) * ket2
+            auto givens=GivensRotForRot_left((rotB.t()*rotK).t().st().eval());
+            auto gates=Fermionic::NOGates(sites,givens);
+            gateTEvol(gates,1,1,ket2,{"Cutoff",1e-4,"Quiet",true, "DoNormalize",true,"ShowPercent",false});
+            g=itensor::innerC(bra,ket2);
+        }
+        out<<t0+(i+1)*dt <<" "<<maxLinkDim(bra)<<" "<<maxLinkDim(ket)<<" "<<g<<" "<<nActiveB<<" "<<nActiveK<<endl;
 
-        double n0=itensor::expectC(psi, sys2.sites, "N",{1}).at(0).real();
-        cd=itensor::innerC(psi, cdOp(sys2.sites), psi).real();
-        out<<(i+1)*abs(dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(psi)<<" "<<0<<" "<<n0<<" "<<cd<<" "<<active.size()<<endl;
-
-        if (i>0 && i%100==0) {
-            cc.save("cc_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
-            rot.save("orb_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
-            //exportPsi(psi,"psi_t"s+to_string(i)+".txt");
-        }        
     }
 
     return 0;
