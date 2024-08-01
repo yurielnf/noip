@@ -136,7 +136,7 @@ int main(int argc, char **argv)
     auto sol2a=computeGS(model2.Ham(rot));
 
     //arma::mat xOp=arma::diagmat(arma::regspace(0,len-1));
-    matriz cc=Fermionic::cc_matrix(sol2a.psi, sol2a.hamsys.sites) * cx_double(1,0);  ///<------------- real!
+    matriz cc=Fermionic::cc_matrix(sol2a.psi, sol2a.hamsys.sites) * cx_double(1,0);
     //cc.save("cc_L"s+to_string(len)+"_gs2_star.txt",arma::raw_ascii);
     //rot.save("orb_L"s+to_string(len)+"_gs2_star.txt",arma::raw_ascii);
 
@@ -168,7 +168,7 @@ int main(int argc, char **argv)
     rot.save("orb_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
     int circuit_nImp=j.at("circuit").at("nImp");
     int circuit_nSite=j.at("circuit").at("nSite");
-    double circuit_dt=j.at("circuit").at("dt");
+    // double circuit_dt=j.at("circuit").at("dt");
     double circuit_tol=j.at("circuit").at("tol");
     if (circuit_nImp==-1)
     {
@@ -197,7 +197,7 @@ int main(int argc, char **argv)
     }
     auto sys1a=model1.Ham(rot);
     auto sol1a=computeGS(sys1a);
-    cc=Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites)* cx_double(1,0);
+    cc=Fermionic::cc_matrix(sol1a.psi, sites)* cx_double(1,0);
 
     //cc.save("cc_L"s+to_string(len)+"_gs1.txt",arma::raw_ascii);
     //rot.save("orb_L"s+to_string(len)+"_gs1.txt",arma::raw_ascii);
@@ -225,20 +225,16 @@ int main(int argc, char **argv)
     double tolActivity=j.at("ip").at("tolActivity");
     auto psi=sol1b.psi;
 
-    ofstream out("irlm_no_green_L"s+to_string(len)+".txt");
-    out<<"time mBra mKet green nActiveBra nActiveKet\n"<<setprecision(14);
-    vec ni=arma::real(cc.diag());
-    int nActive=arma::find(ni>tolActivity && ni<1-tolActivity).eval().size();
-    auto model2_ip=IRLM_ip {model2};
 
-    auto evolve=[&](MPS &psi, matriz &rot, int nActive,double dt) {
+
+    auto evolve=[&](MPS &psi, matriz &rot, int &nActive,double dt) {
         itensor::cpu_time t0;
         int nImpIp=map<string,int> {{"circuit", circuit_nImp},
                                     {"activity", std::max(circuit_nImp,nActive)},
                                     {"none", len}
                                    }.at(j.at("ip").at("type"));
         // auto [sys2,givens,Kip] = model2_ip.HamIP_f(rot,nImpIp,dt);
-        auto [sys2,givens,Kip] = model2_ip.HamIPS(rot, nImpIp, dt, j.at("extract_f"));
+        auto [sys2,givens,Kip] = model2.HamIPS(rot, nImpIp, dt, j.at("extract_f"));
         psi.replaceSiteInds(sys2.sites.inds());
         // if (nImpIp!=len) rot = rot * model2_ip.rotIP(rot,nImpIp,dt) * matrot_from_Givens(givens,len).st();
         if (nImpIp!=len) { rot = rot * matrot_from_Givens(givens,len).st(); }
@@ -267,7 +263,7 @@ int main(int argc, char **argv)
             psi=sol.psi;
         }
         else {
-            auto gates=model2_ip.TrotterGatesExp(Kip,3,dt);
+            auto gates=model2.TrotterGatesExp(Kip,3,dt);
             gateTEvol(gates,1,1,psi,{"Cutoff=",circuit_tol,"Quiet=",true, "DoNormalize",true,"ShowPercent",false});
         }
 
@@ -299,49 +295,58 @@ int main(int argc, char **argv)
                 cout<<endl;
             }
         }
-        return make_tuple();
     };
 
+    ofstream out("irlm_no_green_L"s+to_string(len)+".txt");
+    out<<"time mBra mKet green nActiveBra nActiveKet\n"<<setprecision(14);
+    vec ni=arma::real(cc.diag());
+    int nActive=arma::find(ni>tolActivity && ni<1-tolActivity).eval().size();
 
     for(auto i=0; i*dt<t0; i++) {
         evolve(psi,rot, nActive,dt);
     }
 
-    //--------------------------------------------------- forward ---------------
-    MPS bra=psi, ket=psi;
-    matriz rotB=rot, rotK=rot;
-    int nActiveB=nActive, nActiveK=nActive;
+    auto compute_green=[&](bool is_forward)
+    { //--------------------------------------------------- forward ---------------
+        MPS bra=psi, ket=psi;
+        matriz rotB=rot, rotK=rot;
+        int nActiveB=nActive, nActiveK=nActive;
 
-    {// apply the excitation
-        ket.position(1);
-        auto newA = op(sol1b.hamsys.sites, (greater ? "Adag": "A"), 1)* ket(1);
-        newA.noPrime();
-        ket.ref(1)=newA;
-    }
-
-    for(auto i=0; t0+i*dt<len; i++) {
-        if (verbose) cout<<"-------------------------- iteration "<<i+1<<" --------\n";
-        evolve(ket,rotK,nActiveK,dt);
-        evolve(bra,rotB,nActiveB,dt);
-
-        MPS ket2=ket;
         {// apply the excitation
-            ket2.position(1);
-            auto newA = op(sites, (greater ? "A": "Adag"), 1)* ket2(1);
+            ket.position(1);
+            auto newA = op(sites, (greater ? "Adag": "A"), 1)* ket(1);
             newA.noPrime();
-            ket2.ref(1)=newA;
+            ket.ref(1)=newA;
         }
 
-        complex<double> g;
-        {// exp(Q) * ket2
-            auto givens=GivensRotForRot_left((rotB.t()*rotK).t().st().eval());
-            auto gates=Fermionic::NOGates(sites,givens);
-            gateTEvol(gates,1,1,ket2,{"Cutoff",1e-4,"Quiet",true, "DoNormalize",true,"ShowPercent",false});
-            g=itensor::innerC(bra,ket2);
-        }
-        out<<t0+(i+1)*dt <<" "<<maxLinkDim(bra)<<" "<<maxLinkDim(ket)<<" "<<g<<" "<<nActiveB<<" "<<nActiveK<<endl;
+        double tfinal= is_forward ? len : 0;
+        double mydt= is_forward ? dt : -dt;
+        for(auto i=0; t0+i*dt<len; i++) {
+            if (verbose) cout<<"-------------------------- iteration "<<i+1<<" --------\n";
+            evolve(ket,rotK,nActiveK,dt);
+            evolve(bra,rotB,nActiveB,dt);
 
-    }
+            MPS ket2=ket;
+            {// apply the excitation
+                ket2.position(1);
+                auto newA = op(sites, (greater ? "A": "Adag"), 1)* ket2(1);
+                newA.noPrime();
+                ket2.ref(1)=newA;
+            }
+
+            complex<double> g;
+            {// exp(Q) * ket2
+                auto givens=GivensRotForRot_left((rotB.t()*rotK).t().st().eval());
+                auto gates=Fermionic::NOGates(sites,givens);
+                gateTEvol(gates,1,1,ket2,{"Cutoff",1e-4,"Quiet",true, "DoNormalize",true,"ShowPercent",false});
+                g=itensor::innerC(bra,ket2);
+            }
+            out<<t0+(i+1)*dt <<" "<<maxLinkDim(bra)<<" "<<maxLinkDim(ket)<<" "<<g.real()<<" "<<g.imag()<<" "<<nActiveB<<" "<<nActiveK<<endl;
+
+        }
+    };
+
+
 
     return 0;
 }

@@ -4,7 +4,7 @@
     "extract_f": false,
     "irlm": {
         "U": 0.25,
-        "L": 52
+        "L": 12
     },
     "tdvp": {
         "dt": 0.1,
@@ -25,7 +25,7 @@
         "comment": "type can be one of {none,circuit,activity} meaning {don't use ip, use circuit.nImp, use instantaneous active orbitals}"
     },
     "green": {
-        "t0": 0,
+        "t0": 5,
         "greater": true
     }
 }
