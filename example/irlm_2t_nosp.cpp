@@ -244,7 +244,7 @@ int main(int argc, char **argv)
         if (j.at("extract_f")) {// the circuit to extract f orbitals
             auto rot1=matrot_from_Givens(givens,len);
             auto gates=Fermionic::NOGates(sys2.sites,givens);
-            gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "DoNormalize",true,"ShowPercent",false});
+            gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "DoNormalize",false,"ShowPercent",false});
             if (verbose) cout<<"circuit-f:"<<t0.sincemark()<<endl;
             t0.mark();
         }
@@ -264,7 +264,7 @@ int main(int argc, char **argv)
         }
         else {
             auto gates=model2.TrotterGatesExp(Kip,3,dt);
-            gateTEvol(gates,1,1,psi,{"Cutoff=",circuit_tol,"Quiet=",true, "DoNormalize",true,"ShowPercent",false});
+            gateTEvol(gates,1,1,psi,{"Cutoff=",circuit_tol,"Quiet=",true, "DoNormalize",false,"ShowPercent",false});
         }
 
         if (verbose) cout<<"tdvp time"<<t0.sincemark()<<endl;
@@ -280,7 +280,7 @@ int main(int argc, char **argv)
 //            auto givens=Fermionic::GivensRotForMatrix(cc,circuit_nImp,20);
             auto rot1=matrot_from_Givens(givens,cc.n_rows);
             auto gates=Fermionic::NOGates(sys2.sites,givens);
-            gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "DoNormalize",true,"ShowPercent",false});
+            gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "DoNormalize",false,"ShowPercent",false});
             if (verbose) cout<<"circuit1:"<<t0.sincemark()<<endl;
             t0.mark();
             rot = rot*rot1.st();
@@ -340,7 +340,7 @@ int main(int argc, char **argv)
             {// exp(Q) * ket2
                 auto givens=GivensRotForRot_left((rotB.t()*rotK).t().st().eval());
                 auto gates=Fermionic::NOGates(sites,givens);
-                gateTEvol(gates,1,1,ket2,{"Cutoff",1e-4,"Quiet",true, "DoNormalize",true,"ShowPercent",false});
+                gateTEvol(gates,1,1,ket2,{"Cutoff",1e-4,"Quiet",true, "DoNormalize",false,"ShowPercent",false});
                 g=itensor::innerC(bra,ket2);
             }
             out<<t0+(i+1)*mydt <<" "<<maxLinkDim(bra)<<" "<<maxLinkDim(ket)<<" "<<g.real()<<" "<<g.imag()<<" "<<nActiveB<<" "<<nActiveK<<endl;
