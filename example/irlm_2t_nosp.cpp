@@ -227,7 +227,7 @@ int main(int argc, char **argv)
 
 
 
-    auto evolve=[&](MPS &psi, matriz &rot, int &nActive,double dt) {
+    auto evolve=[&](MPS &psi, matriz &rot, int &nActive, matriz& cc,double dt) {
         itensor::cpu_time t0;
         int nImpIp=map<string,int> {{"circuit", circuit_nImp},
                                     {"activity", std::max(circuit_nImp,nActive)},
@@ -237,7 +237,7 @@ int main(int argc, char **argv)
         auto [sys2,givens,Kip] = model2.HamIPS(rot, nImpIp, dt, j.at("extract_f"));
         psi.replaceSiteInds(sys2.sites.inds());
         // if (nImpIp!=len) rot = rot * model2_ip.rotIP(rot,nImpIp,dt) * matrot_from_Givens(givens,len).st();
-        if (nImpIp!=len) { rot = rot * matrot_from_Givens(givens,len).st(); }
+        if (nImpIp!=len) { rot = rot * model2.rotIPS(rot,nImpIp,dt,cc) * matrot_from_Givens(givens,len).st(); }
         if (verbose) cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
 
@@ -303,14 +303,15 @@ int main(int argc, char **argv)
     int nActive=arma::find(ni>tolActivity && ni<1-tolActivity).eval().size();
 
     for(auto i=0; i*dt<t0; i++) {
-        evolve(psi,rot, nActive,dt);
+        evolve(psi,rot,nActive,cc,dt);
     }
 
     auto compute_green=[&](bool is_forward)
-    { //--------------------------------------------------- forward ---------------
+    {
         MPS bra=psi, ket=psi;
         matriz rotB=rot, rotK=rot;
         int nActiveB=nActive, nActiveK=nActive;
+        matriz ccB=cc, ccK=cc;
 
         {// apply the excitation
             ket.position(1);
@@ -319,12 +320,13 @@ int main(int argc, char **argv)
             ket.ref(1)=newA;
         }
 
-        double tfinal= is_forward ? len : 0;
         double mydt= is_forward ? dt : -dt;
-        for(auto i=0; t0+i*dt<len; i++) {
+        for(auto i=0; ; i++) {
+            if (is_forward && (t0+i*dt>=len)) break;
+            if (!is_forward && (t0-i*dt<=0.0)) break;
             if (verbose) cout<<"-------------------------- iteration "<<i+1<<" --------\n";
-            evolve(ket,rotK,nActiveK,dt);
-            evolve(bra,rotB,nActiveB,dt);
+            evolve(bra,rotB,nActiveB,ccB,mydt);
+            evolve(ket,rotK,nActiveK,ccK,mydt);
 
             MPS ket2=ket;
             {// apply the excitation
@@ -341,12 +343,12 @@ int main(int argc, char **argv)
                 gateTEvol(gates,1,1,ket2,{"Cutoff",1e-4,"Quiet",true, "DoNormalize",true,"ShowPercent",false});
                 g=itensor::innerC(bra,ket2);
             }
-            out<<t0+(i+1)*dt <<" "<<maxLinkDim(bra)<<" "<<maxLinkDim(ket)<<" "<<g.real()<<" "<<g.imag()<<" "<<nActiveB<<" "<<nActiveK<<endl;
-
+            out<<t0+(i+1)*mydt <<" "<<maxLinkDim(bra)<<" "<<maxLinkDim(ket)<<" "<<g.real()<<" "<<g.imag()<<" "<<nActiveB<<" "<<nActiveK<<endl;
         }
     };
 
-
+    compute_green(true);
+    compute_green(false);
 
     return 0;
 }

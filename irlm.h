@@ -244,6 +244,18 @@ struct IRLM_ip {
         return make_tuple(ham, givens, Kip);
     }
 
+
+    /// return the phase of the Fermi sea: exp(-i*dt*H2)
+    template<class T>
+    cmpx rotIPS(arma::Mat<T> const& rot, int nImp, double dt, arma::Mat<T> const& cc)
+    {
+        arma::Mat<T> K0=rot.t()*K*rot;
+        T sum=0;
+        for(size_t i=nImp; i<K0.n_rows; i++)
+            sum += K0(i,i)*cc(i,i);
+        return std::exp(cmpx(0,-dt)*sum);
+    }
+
     template<class T>
     auto TrotterGates(arma::Mat<T> const& Kip,int nTB,double dt) const
     {
