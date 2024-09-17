@@ -1,10 +1,10 @@
 {    
     "verbose": true,
-    "use_tdvp": true,
-    "extract_f": false,
+    "use_tdvp": false,
+    "extract_f": true,
     "irlm": {
         "U": 0.25,
-        "L": 12
+        "L": 24
     },
     "tdvp": {
         "dt": 0.1,
@@ -20,7 +20,7 @@
         "tol": 1e-10
     },
     "ip": {
-        "type": "activity",
+        "type": "circuit",
         "tolActivity": 1e-10,
         "comment": "type can be one of {none,circuit,activity} meaning {don't use ip, use circuit.nImp, use instantaneous active orbitals}"
     },

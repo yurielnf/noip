@@ -227,29 +227,32 @@ int main(int argc, char **argv)
 
 
 
-    auto evolve=[&](MPS &psi, matriz &rot, int &nActive, matriz& cc,double dt) {
+    auto evolve=[&](MPS &psi, matriz &rot, int &nActive, matriz& cc,double dt, MPS *psi2=nullptr) {
         itensor::cpu_time t0;
         int nImpIp=map<string,int> {{"circuit", circuit_nImp},
                                     {"activity", std::max(circuit_nImp,nActive)},
                                     {"none", len}
                                    }.at(j.at("ip").at("type"));
-        // auto [sys2,givens,Kip] = model2_ip.HamIP_f(rot,nImpIp,dt);
-        auto [sys2,givens,Kip] = model2.HamIPS(rot, nImpIp, dt, j.at("extract_f"));
+        auto [sys2,givens,Kip] = model2.HamIP_f(rot,nImpIp,dt);
+        // auto [sys2,givens,Kip] = model2.HamIPS(rot, nImpIp, dt, j.at("extract_f"));
         psi.replaceSiteInds(sys2.sites.inds());
-        // if (nImpIp!=len) rot = rot * model2_ip.rotIP(rot,nImpIp,dt) * matrot_from_Givens(givens,len).st();
-        if (nImpIp!=len) { rot = rot * model2.rotIPS(rot,nImpIp,dt,cc) * matrot_from_Givens(givens,len).st(); }
+        if (psi2) psi2->replaceSiteInds(sys2.sites.inds());
+        if (nImpIp!=len) rot = rot * model2.rotIP(rot,nImpIp,dt) * matrot_from_Givens(givens,len).st();
+        // if (nImpIp!=len) { rot = rot * model2.rotIPS(rot,nImpIp,dt,cc) * matrot_from_Givens(givens,len).st(); }
         if (verbose) cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
 
         if (j.at("extract_f")) {// the circuit to extract f orbitals
-            auto rot1=matrot_from_Givens(givens,len);
+            //auto rot1=matrot_from_Givens(givens,len);
             auto gates=Fermionic::NOGates(sys2.sites,givens);
             gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "DoNormalize",false,"ShowPercent",false});
+            if (psi2) gateTEvol(gates,1,1,*psi2,{"Cutoff",circuit_tol,"Quiet",true, "DoNormalize",false,"ShowPercent",false});
             if (verbose) cout<<"circuit-f:"<<t0.sincemark()<<endl;
             t0.mark();
         }
 
         if (j.at("use_tdvp")) {// tdvp
+            cerr<<"use_tdvp is broken, to be done\n\n"; terminate();
             it_tdvp sol {sys2, psi};
             sol.dt={0,dt};
             sol.bond_dim=512;
@@ -265,6 +268,7 @@ int main(int argc, char **argv)
         else {
             auto gates=model2.TrotterGatesExp(Kip,3,dt);
             gateTEvol(gates,1,1,psi,{"Cutoff=",circuit_tol,"Quiet=",true, "DoNormalize",false,"ShowPercent",false});
+            if (psi2) gateTEvol(gates,1,1,*psi2,{"Cutoff=",circuit_tol,"Quiet=",true, "DoNormalize",false,"ShowPercent",false});
         }
 
         if (verbose) cout<<"tdvp time"<<t0.sincemark()<<endl;
@@ -281,6 +285,7 @@ int main(int argc, char **argv)
             auto rot1=matrot_from_Givens(givens,cc.n_rows);
             auto gates=Fermionic::NOGates(sys2.sites,givens);
             gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "DoNormalize",false,"ShowPercent",false});
+            if (psi2) gateTEvol(gates,1,1,*psi2,{"Cutoff",circuit_tol,"Quiet",true, "DoNormalize",false,"ShowPercent",false});
             if (verbose) cout<<"circuit1:"<<t0.sincemark()<<endl;
             t0.mark();
             rot = rot*rot1.st();
@@ -293,6 +298,11 @@ int main(int argc, char **argv)
                 for(auto i=0; i<psi.length(); i++)
                     cout<<itensor::leftLinkIndex(psi,i+1).dim()<<" ";
                 cout<<endl;
+                if (psi2) {
+                    for(auto i=0; i<psi2->length(); i++)
+                        cout<<itensor::leftLinkIndex(*psi2,i+1).dim()<<" ";
+                    cout<<endl;
+                }
             }
         }
     };
@@ -325,8 +335,8 @@ int main(int argc, char **argv)
             if (is_forward && (t0+i*dt>=len)) break;
             if (!is_forward && (t0-i*dt<=0.0)) break;
             if (verbose) cout<<"-------------------------- iteration "<<i+1<<" --------\n";
-            evolve(bra,rotB,nActiveB,ccB,mydt);
-            evolve(ket,rotK,nActiveK,ccK,mydt);
+            // evolve(bra,rotB,nActiveB,ccB,mydt);
+            evolve(ket,rotK,nActiveK,ccK,mydt, &bra);
 
             MPS ket2=ket;
             {// apply the excitation
@@ -338,9 +348,9 @@ int main(int argc, char **argv)
 
             complex<double> g;
             {// exp(Q) * ket2
-                auto givens=GivensRotForRot_left((rotB.t()*rotK).t().st().eval());
-                auto gates=Fermionic::NOGates(sites,givens);
-                gateTEvol(gates,1,1,ket2,{"Cutoff",1e-4,"Quiet",true, "DoNormalize",false,"ShowPercent",false});
+                // auto givens=GivensRotForRot_left((rotB.t()*rotK).t().st().eval());
+                // auto gates=Fermionic::NOGates(sites,givens);
+                // gateTEvol(gates,1,1,ket2,{"Cutoff",1e-4,"Quiet",true, "DoNormalize",false,"ShowPercent",false});
                 g=itensor::innerC(bra,ket2);
             }
             out<<t0+(i+1)*mydt <<" "<<maxLinkDim(bra)<<" "<<maxLinkDim(ket)<<" "<<g.real()<<" "<<g.imag()<<" "<<nActiveB<<" "<<nActiveK<<endl;
