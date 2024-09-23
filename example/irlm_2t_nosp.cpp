@@ -307,7 +307,7 @@ int main(int argc, char **argv)
         }
     };
 
-    ofstream out("irlm_no_green_L"s+to_string(len)+".txt");
+    ofstream out("irlm_no_green_L"s+to_string(len)+"_g"+to_string(greater)+".txt");
     out<<"time mBra mKet green nActiveBra nActiveKet\n"<<setprecision(14);
     vec ni=arma::real(cc.diag());
     int nActive=arma::find(ni>tolActivity && ni<1-tolActivity).eval().size();

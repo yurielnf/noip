@@ -16,8 +16,10 @@ int main(int argc, char **argv)
 
     int len=20;
     double dt=0.1;
+    bool is_greater=true;
     if (argc>=2) len=atoi(argv[1]);
     if (argc>=3) dt=atof(argv[2]);
+    if (argc>=4) is_greater=atoi(argv[3]);
 
     auto model1=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.0, .ed=0.0};
 
@@ -31,21 +33,21 @@ int main(int argc, char **argv)
     auto green=[&](int i, int j, double t, bool is_greater) {
         cx_mat phase=diagmat(arma::exp(eval1*cx_double(0,-t)));
         double Ef=arma::sum(eval1(arma::find(eval1<0)));
-        cx_rowvec jket=evec1.row(j)*phase*evec1.t()*evec0;
-        cx_rowvec iket=evec1.row(i)*phase*evec1.t()*evec0;
+        rowvec jket=evec1.row(j);
+        cx_rowvec iket=evec1.row(i)*phase;
         cx_double sum=0;
-        for(auto a=0; a<eval0.size(); a++)
-           if (eval0[a]<0) sum += std::conj(iket[a])*jket[a];
+        for(auto a=0; a<eval1.size(); a++)
+           if ((is_greater && eval1[a]>=0) ||
+               (!is_greater && eval1[a]<0)) sum += std::conj(iket[a])*jket[a];
         return sum;
     };
 
-    ofstream out("free_L"s+to_string(len)+".txt");
+    ofstream out("free_green_L"s+to_string(len)+"_g"+to_string(is_greater)+".txt");
     out<<"time M m energy n0\n"<<setprecision(14);
-    out<<"0 0 0 0 "<< corr(0,0,0).real() <<" "<< (corr(0,1,0)+corr(1,0,0)).real() <<endl;
-
     for(auto i=0; i*dt<=len; i++) {
-        double t=dt*(i+1);
-        out<<t<<" 0 0 0 "<< corr(0,0,t).real() <<" "<< (corr(0,1,t)+corr(1,0,t)).real() <<endl;
+        double t=dt*i;
+        cx_double g=green(0,0,t,is_greater);
+        out<<t<<" 0 0 0 "<< g.real() <<" "<< g.imag()<< " 0 0"<<endl;
     }
 
     return 0;
