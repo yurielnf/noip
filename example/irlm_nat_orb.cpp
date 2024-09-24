@@ -244,11 +244,11 @@ int main(int argc, char **argv)
                                     {"activity", std::max(circuit_nImp,(int)active.size())},
                                     {"none", len}
                                    }.at(j.at("ip").at("type"));
-        // auto [sys2,givens,Kip] = model2_ip.HamIP_f(rot,nImpIp,dt);
-        auto [sys2,givens,Kip] = model2_ip.HamIPS(rot, nImpIp, dt, j.at("extract_f"));
+        auto [sys2,givens,Kip] = model2_ip.HamIP_f(rot,nImpIp,dt, j.at("extract_f"));
+//        auto [sys2,givens,Kip] = model2_ip.HamIPS(rot, nImpIp, dt, j.at("extract_f"));
         psi.replaceSiteInds(sys2.sites.inds());
-        // if (nImpIp!=len) rot = rot * model2_ip.rotIP(rot,nImpIp,dt) * matrot_from_Givens(givens,len).st();
-        if (nImpIp!=len) { rot = rot * matrot_from_Givens(givens,len).st();  }
+        if (nImpIp!=len) rot = rot * model2_ip.rotIP(rot,nImpIp,dt) * matrot_from_Givens(givens,len).st();
+//        if (nImpIp!=len) { rot = rot * matrot_from_Givens(givens,len).st();  }
         if (verbose) cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
 

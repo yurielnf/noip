@@ -168,7 +168,7 @@ struct IRLM_ip {
 
     /// return the HamSys and the list of Givens rotations.
     template<class T>
-    std::tuple<HamSys, std::vector<GivensRot<T>>, arma::Mat<T> > HamIP_f(arma::Mat<T> const& rot, int nImp, double dt, double tolSv=1e-12) const
+    std::tuple<HamSys, std::vector<GivensRot<T>>, arma::Mat<T> > HamIP_f(arma::Mat<T> const& rot, int nImp, double dt, bool extractf, double tolSv=1e-12) const
     {
         if (nImp==rot.n_rows) return {Ham(rot),{},{}};
         arma::Mat<T> K0=rot.t()*K*rot;
@@ -181,7 +181,7 @@ struct IRLM_ip {
         Kip.submat(nImp, 0, rot.n_rows-1, nImp-1)+=K1.t();
 
         std::vector<GivensRot<T>> givens;   // TODO: Wannierize the subspace
-        {// the circuit to extract f orbitals
+        if (extractf){// the circuit to extract f orbitals
             auto k12=Kip.submat(0,nImp,nImp-1,rot.n_rows-1);
             arma::vec s;
             arma::Mat<T> U, V;

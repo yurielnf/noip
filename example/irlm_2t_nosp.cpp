@@ -233,7 +233,7 @@ int main(int argc, char **argv)
                                     {"activity", std::max(circuit_nImp,nActive)},
                                     {"none", len}
                                    }.at(j.at("ip").at("type"));
-        auto [sys2,givens,Kip] = model2.HamIP_f(rot,nImpIp,dt);
+        auto [sys2,givens,Kip] = model2.HamIP_f(rot,nImpIp,dt, j.at("extract_f"));
         // auto [sys2,givens,Kip] = model2.HamIPS(rot, nImpIp, dt, j.at("extract_f"));
         psi.replaceSiteInds(sys2.sites.inds());
         if (psi2) psi2->replaceSiteInds(sys2.sites.inds());

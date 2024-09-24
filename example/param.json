@@ -1,10 +1,10 @@
 {    
     "verbose": true,
-    "use_tdvp": false,
-    "extract_f": true,
+    "use_tdvp": true,
+    "extract_f": false,
     "irlm": {
-        "U": 0.25,
-        "L": 24
+        "U": 1.0,
+        "L": 52
     },
     "tdvp": {
         "dt": 0.1,
@@ -14,7 +14,7 @@
     "circuit": {
         "dt": 0.1,
         "nSite": 40,
-        "nImp": 2,
+        "nImp": -1,
         "tolGs2": 1e-5,
         "comment": "if nImp==-1 then it will be determined by the number of active orbitals in gs2 using tolgs2",
         "tol": 1e-10
