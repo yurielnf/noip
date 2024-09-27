@@ -352,6 +352,7 @@ int main(int argc, char **argv)
                 // auto gates=Fermionic::NOGates(sites,givens);
                 // gateTEvol(gates,1,1,ket2,{"Cutoff",1e-4,"Quiet",true, "DoNormalize",false,"ShowPercent",false});
                 g=itensor::innerC(bra,ket2);
+                if (!greater) g=std::conj(g);
             }
             out<<t0+(i+1)*mydt <<" "<<maxLinkDim(bra)<<" "<<maxLinkDim(ket)<<" "<<g.real()<<" "<<g.imag()<<" "<<nActiveB<<" "<<nActiveK<<endl;
         }
