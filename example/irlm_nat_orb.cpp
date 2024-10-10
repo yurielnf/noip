@@ -255,7 +255,7 @@ int main(int argc, char **argv)
         if (j.at("extract_f")) {// the circuit to extract f orbitals
             auto rot1=matrot_from_Givens(givens,len);
             auto gates=Fermionic::NOGates(sys2.sites,givens);
-            gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "DoNormalize",false,"ShowPercent",false});
+            gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "Normalize",false,"ShowPercent",false});
             if (verbose) cout<<"circuit-f:"<<t0.sincemark()<<endl;
             t0.mark();
 
@@ -294,7 +294,7 @@ int main(int argc, char **argv)
             auto gates=model2_ip.TrotterGatesExp(Kip,3,dt);
             // auto gates=model2_ip.TrotterGates(Kip,3,dt);
             //Time evolve, overwriting psi when done
-            gateTEvol(gates,1,1,psi,{"Cutoff=",circuit_tol,"Quiet=",true, "DoNormalize",false,"ShowPercent",false});
+            gateTEvol(gates,1,1,psi,{"Cutoff=",circuit_tol,"Quiet=",true, "Normalize",false,"ShowPercent",false});
         }
 
         if (verbose) cout<<"tdvp time"<<t0.sincemark()<<endl;
@@ -311,7 +311,7 @@ int main(int argc, char **argv)
             auto rot1=matrot_from_Givens(givens,cc.n_rows);
             //real((rot1 * cc * rot1.t()).eval().clean(1e-10).submat(circuit_nImp,circuit_nImp,cc.n_rows-1,cc.n_cols-1)).print("rot1*cc*rot1.t()");
             auto gates=Fermionic::NOGates(sys2.sites,givens);
-            gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "DoNormalize",false,"ShowPercent",false});
+            gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "Normalize",false,"ShowPercent",false});
             if (verbose) cout<<"circuit1:"<<t0.sincemark()<<endl;
             t0.mark();
             //matriz ccr=Fermionic::cc_matrix(psi, sol.hamsys.sites);

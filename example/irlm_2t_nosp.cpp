@@ -127,7 +127,8 @@ int main(int argc, char **argv)
     int len=j.at("irlm").at("L"), nExclude=2;
     double U=j.at("irlm").at("U");
     itensor::Fermion sites(len, {"ConserveNf",true});
-    auto model1=IRLM_ip {sites, IRLM {.L=len, .t=0.5, .V=0.0, .U=U, .ed=-10, .connected=false}};
+    // auto model1=IRLM_ip {sites, IRLM {.L=len, .t=0.5, .V=0.0, .U=U, .ed=-10, .connected=false}};
+    auto model1=IRLM_ip {sites, IRLM {.L=len, .t=0.5, .V=0.1, .U=U, .ed=0.0}};
     auto model2=IRLM_ip {sites, IRLM {.L=len, .t=0.5, .V=0.1, .U=U, .ed=0.0}};
 
     cout<<"\n-------------------------- solve the gs2 ----------------\n" << setprecision(15);
@@ -245,8 +246,8 @@ int main(int argc, char **argv)
         if (j.at("extract_f")) {// the circuit to extract f orbitals
             //auto rot1=matrot_from_Givens(givens,len);
             auto gates=Fermionic::NOGates(sys2.sites,givens);
-            gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "DoNormalize",false,"ShowPercent",false});
-            if (psi2) gateTEvol(gates,1,1,*psi2,{"Cutoff",circuit_tol,"Quiet",true, "DoNormalize",false,"ShowPercent",false});
+            gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "Normalize",false,"ShowPercent",false});
+            if (psi2) gateTEvol(gates,1,1,*psi2,{"Cutoff",circuit_tol,"Quiet",true, "Normalize",false,"ShowPercent",false});
             if (verbose) cout<<"circuit-f:"<<t0.sincemark()<<endl;
             t0.mark();
         }
@@ -267,8 +268,8 @@ int main(int argc, char **argv)
         }
         else {
             auto gates=model2.TrotterGatesExp(Kip,3,dt);
-            gateTEvol(gates,1,1,psi,{"Cutoff=",circuit_tol,"Quiet=",true, "DoNormalize",false,"ShowPercent",false});
-            if (psi2) gateTEvol(gates,1,1,*psi2,{"Cutoff=",circuit_tol,"Quiet=",true, "DoNormalize",false,"ShowPercent",false});
+            gateTEvol(gates,1,1,psi,{"Cutoff=",circuit_tol,"Quiet=",true, "Normalize",false,"ShowPercent",false});
+            if (psi2) gateTEvol(gates,1,1,*psi2,{"Cutoff=",circuit_tol,"Quiet=",true, "Normalize",false,"ShowPercent",false});
         }
 
         if (verbose) cout<<"tdvp time"<<t0.sincemark()<<endl;
@@ -284,8 +285,8 @@ int main(int argc, char **argv)
 //            auto givens=Fermionic::GivensRotForMatrix(cc,circuit_nImp,20);
             auto rot1=matrot_from_Givens(givens,cc.n_rows);
             auto gates=Fermionic::NOGates(sys2.sites,givens);
-            gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "DoNormalize",false,"ShowPercent",false});
-            if (psi2) gateTEvol(gates,1,1,*psi2,{"Cutoff",circuit_tol,"Quiet",true, "DoNormalize",false,"ShowPercent",false});
+            gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "Normalize",false,"ShowPercent",false});
+            if (psi2) gateTEvol(gates,1,1,*psi2,{"Cutoff",circuit_tol,"Quiet",true, "Normalize",false,"ShowPercent",false});
             if (verbose) cout<<"circuit1:"<<t0.sincemark()<<endl;
             t0.mark();
             rot = rot*rot1.st();
@@ -308,7 +309,7 @@ int main(int argc, char **argv)
     };
 
     ofstream out("irlm_no_green_L"s+to_string(len)+"_g"+to_string(greater)+".txt");
-    out<<"time mBra mKet green nActiveBra nActiveKet\n"<<setprecision(14);
+    out<<"time mBra mKet greenRe greenIm nActiveBra nActiveKet\n"<<setprecision(14);
     vec ni=arma::real(cc.diag());
     int nActive=arma::find(ni>tolActivity && ni<1-tolActivity).eval().size();
 
@@ -332,11 +333,11 @@ int main(int argc, char **argv)
 
         double mydt= is_forward ? dt : -dt;
         for(auto i=0; ; i++) {
-            if (is_forward && (t0+i*dt>=len)) break;
+            if (is_forward && (t0+i*dt>=len+dt)) break;
             if (!is_forward && (t0-i*dt<=0.0)) break;
             if (verbose) cout<<"-------------------------- iteration "<<i+1<<" --------\n";
             // evolve(bra,rotB,nActiveB,ccB,mydt);
-            evolve(ket,rotK,nActiveK,ccK,mydt, &bra);
+            if (is_forward && i>0) evolve(ket,rotK,nActiveK,ccK,mydt, &bra);
 
             MPS ket2=ket;
             {// apply the excitation
@@ -350,11 +351,11 @@ int main(int argc, char **argv)
             {// exp(Q) * ket2
                 // auto givens=GivensRotForRot_left((rotB.t()*rotK).t().st().eval());
                 // auto gates=Fermionic::NOGates(sites,givens);
-                // gateTEvol(gates,1,1,ket2,{"Cutoff",1e-4,"Quiet",true, "DoNormalize",false,"ShowPercent",false});
+                // gateTEvol(gates,1,1,ket2,{"Cutoff",1e-4,"Quiet",true, "Normalize",false,"ShowPercent",false});
                 g=itensor::innerC(bra,ket2);
                 if (!greater) g=std::conj(g);
             }
-            out<<t0+(i+1)*mydt <<" "<<maxLinkDim(bra)<<" "<<maxLinkDim(ket)<<" "<<g.real()<<" "<<g.imag()<<" "<<nActiveB<<" "<<nActiveK<<endl;
+            out<<t0+i*mydt <<" "<<maxLinkDim(bra)<<" "<<maxLinkDim(ket)<<" "<<g.real()<<" "<<g.imag()<<" "<<nActiveB<<" "<<nActiveK<<endl;
         }
     };
 
