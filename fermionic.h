@@ -153,6 +153,20 @@ struct Fermionic {
         return cc;
     }
 
+    static arma::cx_mat cc_matrix_kondo(itensor::MPS const& gs, itensor::Fermion const& sites)
+    {
+        itensor::MPS psi=gs;
+        {// apply the excitation
+            psi.position(1);
+            auto newA = op(sites, "A", 1)* psi(1);
+            newA.noPrime();
+            psi.ref(1)=newA;
+        }
+        double norma=itensor::norm(psi);
+
+        return cc_matrix(psi, sites)*norma;
+    }
+
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
     template<class T>
     static std::vector<GivensRot<T>> NOGivensRot(arma::Mat<T> const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10)

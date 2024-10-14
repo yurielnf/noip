@@ -213,8 +213,10 @@ int main(int argc, char **argv)
     auto sys1b=model1.Ham(rot);
     auto sol1b=computeGS(sys1b);
     cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites)* cx_double(1,0);
+    auto cck=Fermionic::cc_matrix_kondo(sol1b.psi, sol1b.hamsys.sites);
 
     cc.save("cc_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
+    cck.save("cck_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
     rot.save("orb_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
 
 
@@ -302,6 +304,7 @@ int main(int argc, char **argv)
 
 
         cc=Fermionic::cc_matrix(psi, sys2.sites)* cx_double(1,0);
+        cck=Fermionic::cc_matrix_kondo(psi, sys2.sites)* cx_double(1,0);
         if (verbose) cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
 
@@ -318,6 +321,7 @@ int main(int argc, char **argv)
             //real(ccr.clean(1e-7).submat(circuit_nImp,circuit_nImp,cc.n_rows-1,cc.n_cols-1)).print("cc after rot");
             rot = rot*rot1.st();
             cc=rot1*cc*rot1.t();
+            cck=rot1*cck*rot1.t();
             //psi.orthogonalize({"Cutoff",circuit_tol});
             vec ni=arma::real(cc.diag());
             active=arma::find(ni>tolActivity && ni<1-tolActivity);
@@ -337,6 +341,7 @@ int main(int argc, char **argv)
 
         if (i>0 && i%100==0) {
             cc.save("cc_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
+            cck.save("cck_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
             rot.save("orb_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
             //exportPsi(psi,"psi_t"s+to_string(i)+".txt");
         }        
