@@ -163,8 +163,7 @@ struct Fermionic {
             psi.ref(1)=newA;
         }
         double norma=itensor::norm(psi);
-
-        return cc_matrix(psi, sites)*norma;
+        return cc_matrix(psi, sites)*pow(norma,2);
     }
 
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
