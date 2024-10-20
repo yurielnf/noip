@@ -107,8 +107,10 @@ arma::Mat<T> MagicRotation(arma::Mat<T> const& cc, arma::Mat<T> const& kin, doub
 }
 
 
-/// ./irlm_nat_orb [len=20] [hamRestricted=1] [dt=0.1] [circuit_dt=0.1]
-int main(int argc, char **argv)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IRLM,L,t,V,U,ed,connected)
+
+
+int main()
 {
     using namespace itensor;
     using namespace arma;
@@ -122,18 +124,19 @@ int main(int argc, char **argv)
         j=json::parse(in);
     }
 
+    cout<<j;
 
     bool verbose=j.at("verbose");
-    int len=j.at("irlm").at("L"), nExclude=2;
-    double U=j.at("irlm").at("U");
+    IRLM m1 = j.at("irlm");
+    int len=m1.L, nExclude=2;
     itensor::Fermion sites(len, {"ConserveNf",true});
-    auto model1=IRLM_ip {sites, IRLM {.L=len, .t=0.5, .V=0.0, .U=U, .ed=-10, .connected=false}};
-    auto model2=IRLM_ip {sites, IRLM {.L=len, .t=0.5, .V=0.1, .U=U, .ed=0.0}};
+    auto model0=IRLM_ip {sites, j.at("irlm0")};
+    auto model=IRLM_ip {sites, j.at("irlm")};
 
     cout<<"\n-------------------------- solve the gs2 ----------------\n" << setprecision(15);
 
-    matriz rot = model2.irlm.rotStar() * cx_double(1,0);
-    auto sol2a=computeGS(model2.Ham(rot));
+    matriz rot = model.irlm.rotStar() * cx_double(1,0);
+    auto sol2a=computeGS(model.Ham(rot));
 
     //arma::mat xOp=arma::diagmat(arma::regspace(0,len-1));
     matriz cc=Fermionic::cc_matrix(sol2a.psi, sol2a.hamsys.sites) * cx_double(1,0);  ///<------------- real!
@@ -143,7 +146,7 @@ int main(int argc, char **argv)
     arma::mat K;
     {
         arma::mat Umat;
-        std::tie(K,Umat)=model2.irlm.matrices();
+        std::tie(K,Umat)=model.irlm.matrices();
     }
 
 
@@ -160,7 +163,7 @@ int main(int argc, char **argv)
         rot = rot*rot1;
     }
 
-    auto sys2b=model2.Ham(rot);
+    auto sys2b=model.Ham(rot);
     auto sol2b=computeGS(sys2b);
 
     cc=Fermionic::cc_matrix(sol2b.psi, sol2b.hamsys.sites) * cx_double(1,0);
@@ -195,7 +198,7 @@ int main(int argc, char **argv)
         rot1.submat(circuit_nImp,circuit_nImp,len-1,len-1)=rot1p;
         rot = rot*rot1;
     }
-    auto sys1a=model1.Ham(rot);
+    auto sys1a=model0.Ham(rot);
     auto sol1a=computeGS(sys1a);
     cc=Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites)* cx_double(1,0);
 
@@ -210,7 +213,7 @@ int main(int argc, char **argv)
         rot = rot*rot1.st();
         cc=rot1*cc*rot1.t();
     }
-    auto sys1b=model1.Ham(rot);
+    auto sys1b=model0.Ham(rot);
     auto sol1b=computeGS(sys1b);
     cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites)* cx_double(1,0);
     auto cck=Fermionic::cc_matrix_kondo(sol1b.psi, sol1b.hamsys.sites);
@@ -238,7 +241,7 @@ int main(int argc, char **argv)
     vec ni=arma::real(cc.diag());
     arma::uvec active=arma::find(ni>tolActivity && ni<1-tolActivity);
     out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<" "<<cd<<" "<<active.size()<<endl;
-    auto model2_ip=IRLM_ip{model2};
+    auto model2_ip=IRLM_ip{model};
     for(auto i=0; i*dt<=len; i++) {
         if (verbose) cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         itensor::cpu_time t0;
