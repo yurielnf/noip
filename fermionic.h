@@ -235,7 +235,7 @@ struct Fermionic {
                     arma::Mat<T> Xevec0;
                     arma::eig_sym(Xeval0,Xevec0,X);
                     xBest=Xeval0.back();
-                    v=evec.col(ieval0(X.n_cols-1));
+                    v=evec0 * Xevec0.col(X.n_cols-1);
                 }
             }
             {// group natural orbitals with occupation 1
@@ -250,7 +250,7 @@ struct Fermionic {
                     arma::Mat<T> Xevec0;
                     arma::eig_sym(Xeval0,Xevec0,X);
                     if (Xeval0.back()>xBest)
-                        v=evec.col(ieval0(X.n_cols-1));
+                        v=evec0 * Xevec0.col(X.n_cols-1);
                 }
             }
 
