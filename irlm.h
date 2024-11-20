@@ -204,6 +204,106 @@ struct IRLM_ip {
         return make_tuple(ham, givens, Kip);
     }
 
+    template<class T>
+    struct HamIPOut
+    {
+        HamSys ham;
+        std::vector<GivensRot<T>> givens;
+        arma::cx_mat Kip;
+        int from=0;  /// the sites to swap in the Slater part
+        int to=0;
+        // the fermionic sign det(rot) also affects the state, but it always cancels out (?)
+    };
+
+    /// return the HamSys and the list of Givens rotations.
+    template<class T>
+    HamIPOut<T> HamIP_f3(arma::Mat<T> const& rot, int nImp, arma::vec ni, double dt, bool extractf, double tolSv=1e-9) const
+    {
+        if (nImp==rot.n_rows) return {Ham(rot),{},{}};
+        HamIPOut<T> out;
+
+        int L=rot.n_cols;
+        arma::cx_mat  Kip; // interaction picture
+        {
+            arma::Mat<T> K0=rot.t()*K*rot;
+            arma::cx_mat K1 = K0.submat(0, nImp, nImp-1, rot.n_rows-1) *
+                               K0.submat(nImp,nImp,rot.n_rows-1, rot.n_rows-1) * arma::cx_double(0,-0.5*dt); //the commutator
+            Kip=K0 * arma::cx_double(1,0);
+            Kip.submat(nImp, nImp, rot.n_rows-1, rot.n_rows-1).fill(0.0);
+            Kip.submat(0,0,nImp-1,nImp-1)=K0.submat(0,0,nImp-1,nImp-1) * arma::cx_double(1,0);
+            Kip.submat(0, nImp, nImp-1, rot.n_rows-1)+=K1;
+            Kip.submat(nImp, 0, rot.n_rows-1, nImp-1)+=K1.t();
+        }
+
+        int p0=rot.n_cols-1; {// the position where Slater starts
+            for(; p0>nImp; p0--)
+                if (ni[p0]>tolSv && ni[p0]<1-tolSv) { p0++; break; }
+        }
+        out.from=p0+1;
+        if (p0+2<L) // in fact there is Slater
+        {
+            // 1) find the first site where the occupation is not the one at posS
+            auto isEmpty=[](double x){ return x<0.5; };  // helper function
+            out.to = std::find_if(ni.begin()+p0+1, ni.end(),
+                                  [n0=ni[p0]](double x) {return isEmpty(x)!=isEmpty(n0); })
+                    - ni.begin();
+
+            // 2) swap sites in the Hamiltonian
+            arma::mat rot(L, L, arma::fill::eye);
+            rot.swap_cols(out.from, out.to);
+            // 3) extract f orbital of the sites with ni=0and ni=1 independently
+            arma::vec nSlater=ni.rows(p0,L-1).eval();
+            arma::uvec posImp(nImp);
+            for(auto i=0; i<nImp; i++) posImp[i]=i;
+
+            { // ni==0
+                arma::uvec pos0=arma::find(nSlater<0.5)+p0;
+                auto k12=Kip.submat(posImp,pos0).eval();
+                arma::vec s;
+                arma::Mat<T> U, V;
+                svd(U,s,V,k12);
+                rot.cols(pos0)=(rot.cols(pos0).eval()*V).eval();
+            }
+            { // ni==1  TODO: this should add a fermionic sign to the state --> det(V)
+                arma::uvec pos0=arma::find(nSlater>0.5)+p0;
+                auto k12=Kip.submat(posImp,pos0).eval();
+                arma::vec s;
+                arma::Mat<T> U, V;
+                svd(U,s,V,k12);
+                rot.cols(pos0)=(rot.cols(pos0).eval()*V).eval();
+            }
+            Kip=(rot.t()*Kip*rot).eval();
+        }
+
+        int p1=std::min(L-1,p0+1);
+        std::vector<GivensRot<T>> givens;
+        if (extractf){// the circuit to extract f orbitals
+            auto k12=Kip.submat(0,nImp,nImp-1,p1);
+            arma::vec s;
+            arma::Mat<T> U, V;
+            svd_econ(U,s,V,arma::conj(k12));
+            int nSv=arma::find(s>tolSv*s[0]).eval().size();
+            //std::cout<<"nSV="<<nSv<<std::endl;
+            givens=GivensRotForRot_left(V.head_cols(nSv).eval());
+            for(auto& g:givens) g.b+=nImp;
+            arma::Mat<T> rot1=matrot_from_Givens(givens, rot.n_cols).st();
+            Kip=(rot1.t()*Kip*rot1).eval();
+        }
+
+        auto h=hImp;
+        for(auto i=0; i<sites.length(); i++)
+            for(auto j=0; j<sites.length(); j++)
+            if (std::abs(Kip(i,j))>tolSv)
+                h += Kip(i,j),"Cdag",i+1,"C",j+1;
+        auto mpo=itensor::toMPO(h);
+
+        // prepare the output
+        out.ham=HamSys{sites,mpo,mpo};
+        out.Kip=Kip;
+        out.givens=givens;
+        return out;
+    }
+
     /// return the HamSys and the list of Givens rotations to be applied to the state.
     /// It implement the interaction picture for the Slater part only.
     /// nImp is the number of active orbitals.
