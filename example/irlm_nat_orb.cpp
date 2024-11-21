@@ -249,39 +249,32 @@ int main()
                                     {"activity", std::max(circuit_nImp,(int)active.size())},
                                     {"none", len}
                                    }.at(j.at("ip").at("type"));
-        auto [sys2,givens,Kip] = model2_ip.HamIP_f(rot,nImpIp,dt, j.at("extract_f"));
+        //auto [sys2,givens,Kip] = model2_ip.HamIP_f(rot,nImpIp,dt, j.at("extract_f"));
+        auto hip=model2_ip.HamIP_f3(rot, nImpIp, ni, dt, j.at("extract_f"));
 //        auto [sys2,givens,Kip] = model2_ip.HamIPS(rot, nImpIp, dt, j.at("extract_f"));
-        psi.replaceSiteInds(sys2.sites.inds());
-        if (nImpIp!=len) rot = rot * model2_ip.rotIP(rot,nImpIp,dt) * matrot_from_Givens(givens,len).st();
+        psi.replaceSiteInds(hip.ham.sites.inds());
+        if (hip.from != hip.to) { // swap sites
+            itensor::AutoMPO ampo(sites);
+            ampo += "Cdag",hip.from+1, "C",hip.to+1;
+            ampo += "Cdag",hip.to+1,"C",hip.from+1;
+            auto op = itensor::toMPO(ampo);
+            psi = applyMPO(op,psi);
+            psi.replaceSiteInds(hip.ham.sites.inds());
+        }
+        if (nImpIp!=len) rot = rot * hip.rot;
 //        if (nImpIp!=len) { rot = rot * matrot_from_Givens(givens,len).st();  }
         if (verbose) cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
 
         if (j.at("extract_f")) {// the circuit to extract f orbitals
-            auto rot1=matrot_from_Givens(givens,len);
-            auto gates=Fermionic::NOGates(sys2.sites,givens);
+            auto gates=Fermionic::NOGates(hip.ham.sites,hip.givens);
             gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "Normalize",false,"ShowPercent",false});
             if (verbose) cout<<"circuit-f:"<<t0.sincemark()<<endl;
             t0.mark();
-
-            // matriz kin=(rot.t()*K*rot);
-            // kin.submat(nImpIp,nImpIp,len-1,len-1).fill(0);
-            // matriz k12=kin.submat(0,nImpIp,nImpIp-1,len-1);
-            // vec s;
-            // matriz U,V;
-            // svd_econ(U,s,V,arma::conj(k12));
-            // int nSv=arma::find(s>1e-12*s[0]).eval().size();
-            // auto givens=GivensRotForRot_left(V.head_cols(nSv).eval());
-            // for(auto& g:givens) g.b+=nImpIp;
-            // matriz rot1=matrot_from_Givens(givens,len);
-            // rot = rot*rot1.st();
-            // kin.print("kin");
-            // (rot1.st().t()*kin*rot1.st()).eval().clean(1e-15).print("kin after rot f");
-            // return 0;
         }
 
         if (j.at("use_tdvp")) {// tdvp
-            it_tdvp sol {sys2, psi};
+            it_tdvp sol {hip.ham, psi};
             sol.dt={0,dt};
             sol.bond_dim=512;
             sol.rho_cutoff=1e-14;
@@ -296,7 +289,7 @@ int main()
         else {
             //Kip.clean(1e-13).print("Kip");
             //cout<<"U="<<model2_ip.irlm.U<<endl;
-            auto gates=model2_ip.TrotterGatesExp(Kip,3,dt);
+            auto gates=model2_ip.TrotterGatesExp(hip.Kip,3,dt);
             // auto gates=model2_ip.TrotterGates(Kip,3,dt);
             //Time evolve, overwriting psi when done
             gateTEvol(gates,1,1,psi,{"Cutoff=",circuit_tol,"Quiet=",true, "Normalize",false,"ShowPercent",false});
@@ -306,8 +299,8 @@ int main()
         t0.mark();
 
 
-        cc=Fermionic::cc_matrix(psi, sys2.sites)* cx_double(1,0);
-        cck=Fermionic::cc_matrix_kondo(psi, sys2.sites)* cx_double(1,0);
+        cc=Fermionic::cc_matrix(psi, hip.ham.sites)* cx_double(1,0);
+        cck=Fermionic::cc_matrix_kondo(psi, hip.ham.sites)* cx_double(1,0);
         if (verbose) cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
 
@@ -316,7 +309,7 @@ int main()
 //            auto givens=Fermionic::GivensRotForMatrix(cc,circuit_nImp,20);
             auto rot1=matrot_from_Givens(givens,cc.n_rows);
             //real((rot1 * cc * rot1.t()).eval().clean(1e-10).submat(circuit_nImp,circuit_nImp,cc.n_rows-1,cc.n_cols-1)).print("rot1*cc*rot1.t()");
-            auto gates=Fermionic::NOGates(sys2.sites,givens);
+            auto gates=Fermionic::NOGates(hip.ham.sites,givens);
             gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "Normalize",false,"ShowPercent",false});
             if (verbose) cout<<"circuit1:"<<t0.sincemark()<<endl;
             t0.mark();
@@ -326,7 +319,7 @@ int main()
             cc=rot1*cc*rot1.t();
             cck=rot1*cck*rot1.t();
             //psi.orthogonalize({"Cutoff",circuit_tol});
-            vec ni=arma::real(cc.diag());
+            ni=arma::real(cc.diag());
             active=arma::find(ni>tolActivity && ni<1-tolActivity);
 
             if (verbose) {
@@ -334,13 +327,13 @@ int main()
                 for(auto i=0; i<psi.length(); i++)
                     cout<<itensor::leftLinkIndex(psi,i+1).dim()<<" ";
                 cout<<endl;
-            }            
+            }
         }
 
 
-        double n0=itensor::expectC(psi, sys2.sites, "N",{1}).at(0).real();
-        cd=itensor::innerC(psi, cdOp(sys2.sites), psi).real();
-        out<<(i+1)*abs(dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(psi)<<" "<<0<<" "<<n0<<" "<<cd<<" "<<active.size()<<endl;
+        double n0=itensor::expectC(psi, hip.ham.sites, "N",{1}).at(0).real();
+        cd=itensor::innerC(psi, cdOp(hip.ham.sites), psi).real();
+        out<<(i+1)*abs(dt)<<" "<< maxLinkDim(hip.ham.ham) <<" "<<maxLinkDim(psi)<<" "<<0<<" "<<n0<<" "<<cd<<" "<<active.size()<<endl;
 
         if (i>0 && i%100==0) {
             cc.save("cc_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
