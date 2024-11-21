@@ -168,15 +168,17 @@ struct Fermionic {
 
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
     template<class T>
-    static std::vector<GivensRot<T>> NOGivensRot(arma::Mat<T> const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10)
+    static std::vector<GivensRot<T>> NOGivensRot(arma::Mat<T> const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10, int pfinal=-1)
     {
+        if (pfinal==-1) pfinal=cc.n_rows-1;
         using namespace arma;
         arma::Mat<T> cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
         std::vector<GivensRot<T>> gs;
         arma::Mat<T> evec;
         arma::vec eval;
         size_t d=blockSize;
-        for(auto p2=cc1.n_rows-1; p2>0u; p2--) {
+        pfinal -= nExclude;
+        for(auto p2=pfinal; p2>0u; p2--) {
             size_t p1= (p2+1>d) ? p2+1-d : 0u ;
             arma::Mat<T> cc2=cc1.submat(p1,p1,p2,p2);
             arma::eig_sym(eval,evec,cc2);
@@ -203,15 +205,17 @@ struct Fermionic {
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
     // from the wannierized inactive orbitals, move right the one with biggest <X>
     template<class T>
-    static std::vector<GivensRot<T>> NOGivensRot_W(arma::Mat<T> const& cc, int nExclude=2, size_t blockSize=8, double tolActivity=1e-9)
+    static std::vector<GivensRot<T>> NOGivensRot_W(arma::Mat<T> const& cc, int nExclude=2, size_t blockSize=8, double tolActivity=1e-9, int pfinal=-1)
     {
+        if (pfinal==-1) pfinal=cc.n_rows-1;
         using namespace arma;
         arma::Mat<T> cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
         std::vector<GivensRot<T>> gs;
         arma::Mat<T> evec;
         arma::vec eval;
         size_t d=blockSize;
-        for(auto p2=cc1.n_rows-1; p2>0u; p2--) {
+        pfinal -= nExclude;
+        for(auto p2=pfinal; p2>0u; p2--) {
             size_t p1= (p2+1>d) ? p2+1-d : 0u ;
             arma::Mat<T> cc2=cc1.submat(p1,p1,p2,p2);
             arma::eig_sym(eval,evec,cc2);
@@ -258,7 +262,7 @@ struct Fermionic {
             std::vector<GivensRot<T>> gs1;
             for(auto i=0u; i+1<v.size(); i++)
             {
-                if (std::abs(v[i])*blockSize<tolActivity) continue; // already done
+                // if (std::abs(v[i])*blockSize<tolActivity) continue; // already done
                 auto b=i+p1;
                 auto g=GivensRot<T>::createFromPair(b,v[i],v[i+1],true, &v[i+1]);
                 gs1.push_back(g);

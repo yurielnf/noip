@@ -124,7 +124,7 @@ int main()
         j=json::parse(in);
     }
 
-    cout<<j;
+    cout<<setw(4)<<j;
 
     bool verbose=j.at("verbose");
     IRLM m1 = j.at("irlm");
@@ -304,8 +304,8 @@ int main()
         if (verbose) cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
 
-        if (std::abs(i*dt-std::round(i*dt/circuit_dt)*circuit_dt) < 0.5*dt) {        
-            auto givens=Fermionic::NOGivensRot_W(cc,circuit_nImp,circuit_nSite,tolActivity);
+        if (std::abs(i*dt-std::round(i*dt/circuit_dt)*circuit_dt) < 0.5*dt) {
+            auto givens=Fermionic::NOGivensRot(cc,circuit_nImp,circuit_nSite,tolActivity,hip.from);
 //            auto givens=Fermionic::GivensRotForMatrix(cc,circuit_nImp,20);
             auto rot1=matrot_from_Givens(givens,cc.n_rows);
             //real((rot1 * cc * rot1.t()).eval().clean(1e-10).submat(circuit_nImp,circuit_nImp,cc.n_rows-1,cc.n_cols-1)).print("rot1*cc*rot1.t()");
