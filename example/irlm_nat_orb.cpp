@@ -295,6 +295,16 @@ int main()
             gateTEvol(gates,1,1,psi,{"Cutoff=",circuit_tol,"Quiet=",true, "Normalize",false,"ShowPercent",false});
         }
 
+        if (false && j.at("extract_f")) {// the circuit to extract f orbitals applied in reverse
+            auto givens=hip.givens;
+            std::reverse(givens.begin(), givens.end());
+            for(auto& g:givens) g=g.dagger();
+            auto gates=Fermionic::NOGates(hip.ham.sites,givens);
+            gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "Normalize",false,"ShowPercent",false});
+            if (verbose) cout<<"circuit-f:"<<t0.sincemark()<<endl;
+            t0.mark();
+        }
+
         if (verbose) cout<<"tdvp time"<<t0.sincemark()<<endl;
         t0.mark();
 

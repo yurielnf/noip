@@ -68,6 +68,7 @@ struct GivensRot {
     GivensRot<cmpx> operator*(cmpx z) const { GivensRot<cmpx> g{.b=b}; g.c=c*z; g.s=s*z; return g;}
 
     //void transposeInPlace() {s=-s;}
+    GivensRot<T> dagger() const;
 };
 
 
@@ -118,6 +119,9 @@ GivensRot<double> GivensRot<double>::createFromPair(size_t b, double p,  double 
 
 template<>
 GivensRot<double>::matrix22 GivensRot<double>::matrix() const { return {{c, -s},{s, c}}; }
+
+template<>
+GivensRot<double> GivensRot<double>::dagger() const { return {.b=b, .c=c, .s=-s}; }
 
 template<>
 GivensRot<cmpx> GivensRot<cmpx>::createFromPair(size_t b, cmpx p, cmpx q, bool go_right, cmpx *r)
@@ -187,6 +191,8 @@ GivensRot<cmpx> GivensRot<cmpx>::createFromPair(size_t b, cmpx p, cmpx q, bool g
 template<>
 GivensRot<cmpx>::matrix22 GivensRot<cmpx>::matrix() const { return {{std::conj(c), -std::conj(s)},{s, c}}; }
 
+template<>
+GivensRot<cmpx> GivensRot<cmpx>::dagger() const { return {.b=b, .c=std::conj(c), .s=-s}; }
 
 template<class T>
 arma::Mat<T> matrot_from_Givens(std::vector<GivensRot<T>> const& gates, size_t n)
