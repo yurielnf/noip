@@ -180,7 +180,7 @@ struct Fermionic {
         pfinal -= nExclude;
         for(auto p2=pfinal; p2>0u; p2--) {
             size_t p1= (p2+1>d) ? p2+1-d : 0u ;
-            if(p2+2>pfinal) p1=0;
+            if(p2+4>pfinal) p1=0;
             arma::Mat<T> cc2=cc1.submat(p1,p1,p2,p2);
             arma::eig_sym(eval,evec,cc2);
             // select the less active
@@ -218,7 +218,7 @@ struct Fermionic {
         pfinal -= nExclude;
         for(auto p2=pfinal; p2>0u; p2--) {
             size_t p1= (p2+1>d) ? p2+1-d : 0u ;
-            if(p2+2>pfinal) p1=0;
+            if(p2+4>pfinal) p1=0;
             arma::Mat<T> cc2=cc1.submat(p1,p1,p2,p2);
             arma::eig_sym(eval,evec,cc2);
 
