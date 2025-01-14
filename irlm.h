@@ -237,23 +237,27 @@ struct IRLM_ip {
         }
         out.rot=this->rotIP(rot,nImp,dt);
 
-        int p0=rot.n_cols-1; {// the position where Slater starts
+        int p0=L-1; {// the position where Slater starts
             for(; p0>nImp; p0--)
                 if (ni[p0]>tolSv && ni[p0]<1-tolSv) { p0++; break; }
         }
-        out.from=p0+1;
         if (p0+2<L) // in fact there is Slater
         {
-            // 1) find the first site where the occupation is not the one at posS
-            auto isEmpty=[](double x){ return x<0.5; };  // helper function
-            out.to = std::find_if(ni.begin()+p0+1, ni.end(),
-                                  [&,n0=ni[p0]](double x) {return isEmpty(x)!=isEmpty(n0); })
-                    - ni.begin();
+            out.from=out.to=p0+1;
+            { // 1) find the first site where the occupation is not the one at p0
+                auto isEmpty=[](double x){ return x<0.5; };  // helper function
+                out.to = std::find_if(ni.begin()+p0+1, ni.end(),
+                                      [&,n0=ni[p0]](double x) {return isEmpty(x)!=isEmpty(n0); })
+                         - ni.begin();
+            }
 
-            // 2) swap sites in the Hamiltonian
-            std::swap(ni[out.from], ni[out.to]);
-            arma::cx_mat rot1(L, L, arma::fill::eye);
-            rot1.swap_cols(out.from, out.to);
+            { // 2) swap sites in the Hamiltonian
+                std::swap(ni[out.from], ni[out.to]);
+                arma::cx_mat rot1(L, L, arma::fill::eye);
+                rot1.swap_cols(out.from, out.to);
+                Kip=(rot1.t()*Kip*rot1).eval();
+                out.rot=out.rot*rot1;
+            }
             // 3) extract f orbital of the sites with ni=0 and ni=1 independently
             arma::vec nSlater=ni.rows(p0,L-1).eval();
             arma::uvec posImp(nImp);
@@ -265,7 +269,10 @@ struct IRLM_ip {
                 arma::vec s;
                 arma::Mat<T> U, V;
                 svd(U,s,V,k12);
+                arma::cx_mat rot1(L, L, arma::fill::eye);
                 rot1.cols(pos0)=(rot1.cols(pos0).eval()*V).eval();
+                Kip=(rot1.t()*Kip*rot1).eval();
+                out.rot=out.rot*rot1;
             }
             { // ni==1  TODO: this should add a fermionic sign to the state --> det(V)
                 arma::uvec pos0=arma::find(nSlater>0.5)+p0;
@@ -273,10 +280,12 @@ struct IRLM_ip {
                 arma::vec s;
                 arma::Mat<T> U, V;
                 svd(U,s,V,k12);
+                arma::cx_mat rot1(L, L, arma::fill::eye);
                 rot1.cols(pos0)=(rot1.cols(pos0).eval()*V).eval();
+                Kip=(rot1.t()*Kip*rot1).eval();
+                out.rot=out.rot*rot1;
             }
-            Kip=(rot1.t()*Kip*rot1).eval();
-            out.rot=out.rot*rot1;
+
         }
 
         std::vector<GivensRot<T>> givens;
