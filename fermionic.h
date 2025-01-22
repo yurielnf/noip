@@ -170,7 +170,7 @@ struct Fermionic {
     template<class T>
     static std::vector<GivensRot<T>> NOGivensRot(arma::Mat<T> const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10, int pfinal=-1)
     {
-        if (pfinal==-1) pfinal=cc.n_rows-1;
+        if (pfinal==-1 || pfinal>cc.n_rows-1) pfinal=cc.n_rows-1;
         using namespace arma;
         arma::Mat<T> cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
         std::vector<GivensRot<T>> gs;

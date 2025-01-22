@@ -205,7 +205,7 @@ arma::Mat<T> matrot_from_Givens(std::vector<GivensRot<T>> const& gates, size_t n
     for(int i=gates.size()-1; i>=0; i--) { // apply to the right in reverse
 //    for(auto i=0u; i<gates.size(); i++) {
         const GivensRot<T>& g=gates[i];
-        rot.submat(0,g.b,n-1,g.b+1) = rot.submat(0,g.b,n-1,g.b+1) * g.matrix();
+        rot.cols(g.b,g.b+1) = rot.cols(g.b,g.b+1).eval() * g.matrix();
     }
     return rot;
 }

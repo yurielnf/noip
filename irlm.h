@@ -237,71 +237,89 @@ struct IRLM_ip {
         }
         out.rot=this->rotIP(rot,nImp,dt);
 
-        int p0=L-1; {// the position where Slater starts
-            for(; p0>nImp; p0--)
-                if (ni[p0]>tolSv && ni[p0]<1-tolSv) { p0++; break; }
+        int p0=L-1; {// the position before Slater starts
+            for(; p0>=nImp; p0--)
+                if (ni[p0]>tolSv && ni[p0]<1-tolSv) break;
         }
+        out.from=out.to=p0+2;
         if (p0+2<L) // in fact there is Slater
         {
-            out.from=out.to=p0+1;
-            { // 1) find the first site where the occupation is not the one at p0
+            { // 1) find the first site where the occupation is not the one at p0+1
                 auto isEmpty=[](double x){ return x<0.5; };  // helper function
-                out.to = std::find_if(ni.begin()+p0+1, ni.end(),
-                                      [&,n0=ni[p0]](double x) {return isEmpty(x)!=isEmpty(n0); })
+                out.to = std::find_if(ni.begin()+p0+2, ni.end(),
+                                      [&,n0=ni[p0+1]](double x) {return isEmpty(x)!=isEmpty(n0); })
                          - ni.begin();
             }
 
-            { // 2) swap sites in the Hamiltonian
+            // arma::vec(ni).clean(1e-9).raw_print("ni=");
+
+            if (out.from != out.to && out.to!=L){ // 2) swap sites in the Hamiltonian
                 std::swap(ni[out.from], ni[out.to]);
                 arma::cx_mat rot1(L, L, arma::fill::eye);
                 rot1.swap_cols(out.from, out.to);
                 Kip=(rot1.t()*Kip*rot1).eval();
-                out.rot=out.rot*rot1;
+                out.rot=out.rot*rot1;                
             }
             // 3) extract f orbital of the sites with ni=0 and ni=1 independently
-            arma::vec nSlater=ni.rows(p0,L-1).eval();
+            arma::vec nSlater=ni.rows(p0+1,L-1).eval();
             arma::uvec posImp(nImp);
             for(auto i=0; i<nImp; i++) posImp[i]=i;
-
+            // std::cout<<out.from<<" --> "<< out.to<<std::endl; std::cout.flush();
             { // ni==0
-                arma::uvec pos0=arma::find(nSlater<0.5)+p0;
-                auto k12=Kip.submat(posImp,pos0).eval();
-                arma::vec s;
-                arma::Mat<T> U, V;
-                svd(U,s,V,k12);
-                arma::cx_mat rot1(L, L, arma::fill::eye);
-                rot1.cols(pos0)=(rot1.cols(pos0).eval()*V).eval();
-                Kip=(rot1.t()*Kip*rot1).eval();
-                out.rot=out.rot*rot1;
+                arma::uvec pos0=arma::find(nSlater<0.5)+p0+1;
+                if (!pos0.empty()) {
+                    // pos0.print("empty");
+                    auto k12=Kip.submat(posImp,pos0).eval();
+                    arma::vec s;
+                    arma::Mat<T> U, V;
+                    svd(U,s,V,k12);
+                    arma::cx_mat rot1(L, L, arma::fill::eye);
+                    rot1.cols(pos0)=(rot1.cols(pos0).eval()*V).eval();
+                    Kip=(rot1.t()*Kip*rot1).eval();
+                    out.rot=out.rot*rot1;
+                    //arma::abs(Kip).eval().clean(1e-6).print("kip empty");
+                }
             }
             { // ni==1  TODO: this should add a fermionic sign to the state --> det(V)
-                arma::uvec pos0=arma::find(nSlater>0.5)+p0;
-                auto k12=Kip.submat(posImp,pos0).eval();
-                arma::vec s;
-                arma::Mat<T> U, V;
-                svd(U,s,V,k12);
-                arma::cx_mat rot1(L, L, arma::fill::eye);
-                rot1.cols(pos0)=(rot1.cols(pos0).eval()*V).eval();
-                Kip=(rot1.t()*Kip*rot1).eval();
-                out.rot=out.rot*rot1;
+                arma::uvec pos0=arma::find(nSlater>0.5)+p0+1;
+                if (!pos0.empty()) {
+                    // pos0.print("full");
+                    auto k12=Kip.submat(posImp,pos0).eval();
+                    arma::vec s;
+                    arma::Mat<T> U, V;
+                    svd(U,s,V,k12);
+                    arma::cx_mat rot1(L, L, arma::fill::eye);
+                    rot1.cols(pos0)=(rot1.cols(pos0).eval()*V).eval();
+                    Kip=(rot1.t()*Kip*rot1).eval();
+                    out.rot=out.rot*rot1;
+                    //arma::abs(Kip).eval().clean(1e-6).print("kip full");
+                }
             }
 
         }
 
         std::vector<GivensRot<T>> givens;
         if (extractf){// the circuit to extract f orbitals
-            int p1=std::min(L-1,p0+1);
+            auto Kip2=Kip.eval();
+            // arma::abs(Kip2).eval().clean(1e-6).print("Kip before f");
+            int p1=std::min(L-1,p0+2);
+            if (out.to==L) p1=p0+1;
             auto k12=Kip.submat(0,nImp,nImp-1,p1);
             arma::vec s;
             arma::Mat<T> U, V;
-            svd_econ(U,s,V,arma::conj(k12));
+            svd_econ(U,s,V,k12);
             int nSv=arma::find(s>tolSv*s[0]).eval().size();
             //std::cout<<"nSV="<<nSv<<std::endl;
-            givens=GivensRotForRot_left(V.head_cols(nSv).eval());
+            givens=GivensRotForRot_left(arma::conj(V.head_cols(nSv)).eval());
             for(auto& g:givens) g.b+=nImp;
-            arma::Mat<T> rot1=matrot_from_Givens(givens, rot.n_cols).st();
+            arma::cx_mat rot1(L, L, arma::fill::eye);
+            rot1.cols(0,p1)=rot1.cols(0,p1).eval() * matrot_from_Givens(givens, k12.n_cols+nImp).st();
             Kip=(rot1.t()*Kip*rot1).eval();
             out.rot = out.rot * rot1;
+            // V.head_cols(nSv).eval().clean(1e-6).print("V for f");
+            // arma::cx_mat(rot1).clean(1e-6).print("rot1 for f");
+            // std::cout<<"\n is rot = "<<arma::norm(rot1.t()*rot1-arma::eye(arma::size(rot1)))<<"\n";
+            // arma::abs(Kip-Kip2).eval().clean(1e-6).print("kip diff");
         }
 
         auto h=hImp;

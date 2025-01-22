@@ -250,10 +250,10 @@ int main()
                                     {"none", len}
                                    }.at(j.at("ip").at("type"));
         //auto [sys2,givens,Kip] = model2_ip.HamIP_f(rot,nImpIp,dt, j.at("extract_f"));
-        auto hip=model2_ip.HamIP_f3(rot, nImpIp, ni, dt, j.at("extract_f"));
+        auto hip=model2_ip.HamIP_f3(rot, nImpIp, ni, dt, j.at("extract_f"),tolActivity);
 //        auto [sys2,givens,Kip] = model2_ip.HamIPS(rot, nImpIp, dt, j.at("extract_f"));
         psi.replaceSiteInds(hip.ham.sites.inds());
-        if (hip.from != hip.to) { // swap sites
+        if (hip.from != hip.to && hip.to!=len) { // swap sites
             itensor::AutoMPO ampo(sites);
             ampo += "Cdag",hip.from+1, "C",hip.to+1;
             ampo += "Cdag",hip.to+1,"C",hip.from+1;
@@ -261,6 +261,7 @@ int main()
             psi = applyMPO(op,psi);
             psi.replaceSiteInds(hip.ham.sites.inds());
         }
+        // arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag()).print("ni when hip");
         if (nImpIp!=len) rot = rot * hip.rot;
 //        if (nImpIp!=len) { rot = rot * matrot_from_Givens(givens,len).st();  }
         if (verbose) cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
@@ -272,6 +273,8 @@ int main()
             if (verbose) cout<<"circuit-f:"<<t0.sincemark()<<endl;
             t0.mark();
         }
+
+        if (verbose) arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag()).print("ni after f");
 
         if (j.at("use_tdvp")) {// tdvp
             it_tdvp sol {hip.ham, psi};
@@ -295,6 +298,8 @@ int main()
             gateTEvol(gates,1,1,psi,{"Cutoff=",circuit_tol,"Quiet=",true, "Normalize",false,"ShowPercent",false});
         }
 
+        if (verbose) arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag()).print("ni after Trotter");
+
         if (false && j.at("extract_f")) {// the circuit to extract f orbitals applied in reverse
             auto givens=hip.givens;
             std::reverse(givens.begin(), givens.end());
@@ -315,7 +320,7 @@ int main()
         t0.mark();
 
         if (std::abs(i*dt-std::round(i*dt/circuit_dt)*circuit_dt) < 0.5*dt) {
-            auto givens=Fermionic::NOGivensRot(cc,circuit_nImp,circuit_nSite,tolActivity,hip.from);
+            auto givens=Fermionic::NOGivensRot(cc,circuit_nImp,circuit_nSite,tolActivity, hip.from);
 //            auto givens=Fermionic::GivensRotForMatrix(cc,circuit_nImp,20);
             auto rot1=matrot_from_Givens(givens,cc.n_rows);
             //real((rot1 * cc * rot1.t()).eval().clean(1e-10).submat(circuit_nImp,circuit_nImp,cc.n_rows-1,cc.n_cols-1)).print("rot1*cc*rot1.t()");
@@ -329,7 +334,8 @@ int main()
             cc=rot1*cc*rot1.t();
             cck=rot1*cck*rot1.t();
             //psi.orthogonalize({"Cutoff",circuit_tol});
-            ni=arma::real(cc.diag());
+            // ni=arma::real(cc.diag());
+            ni=arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag());
             active=arma::find(ni>tolActivity && ni<1-tolActivity);
 
             if (verbose) {
@@ -338,6 +344,8 @@ int main()
                     cout<<itensor::leftLinkIndex(psi,i+1).dim()<<" ";
                 cout<<endl;
             }
+
+            if (verbose) arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag()).print("ni after circuit");
         }
 
 
