@@ -274,7 +274,7 @@ int main()
             t0.mark();
         }
 
-        if (verbose) arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag()).print("ni after f");
+        // if (verbose) arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag()).print("ni after f");
 
         if (j.at("use_tdvp")) {// tdvp
             it_tdvp sol {hip.ham, psi};
@@ -298,7 +298,7 @@ int main()
             gateTEvol(gates,1,1,psi,{"Cutoff=",circuit_tol,"Quiet=",true, "Normalize",false,"ShowPercent",false});
         }
 
-        if (verbose) arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag()).print("ni after Trotter");
+        // if (verbose) arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag()).print("ni after Trotter");
 
         if (false && j.at("extract_f")) {// the circuit to extract f orbitals applied in reverse
             auto givens=hip.givens;
@@ -334,8 +334,8 @@ int main()
             cc=rot1*cc*rot1.t();
             cck=rot1*cck*rot1.t();
             //psi.orthogonalize({"Cutoff",circuit_tol});
-            // ni=arma::real(cc.diag());
-            ni=arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag());
+            ni=arma::real(cc.diag());
+            // ni=arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag());
             active=arma::find(ni>tolActivity && ni<1-tolActivity);
 
             if (verbose) {
@@ -345,7 +345,7 @@ int main()
                 cout<<endl;
             }
 
-            if (verbose) arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag()).print("ni after circuit");
+            // if (verbose) arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag()).print("ni after circuit");
         }
 
 
