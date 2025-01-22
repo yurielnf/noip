@@ -126,6 +126,7 @@ int main()
 
     cout<<setw(4)<<j;
 
+    bool save=false;
     bool verbose=j.at("verbose");
     IRLM m1 = j.at("irlm");
     int len=m1.L, nExclude=2;
@@ -167,8 +168,8 @@ int main()
     auto sol2b=computeGS(sys2b);
 
     cc=Fermionic::cc_matrix(sol2b.psi, sol2b.hamsys.sites) * cx_double(1,0);
-    cc.save("cc_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
-    rot.save("orb_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
+    if (save) cc.save("cc_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
+    if (save) rot.save("orb_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
     int circuit_nImp=j.at("circuit").at("nImp");
     int circuit_nSite=j.at("circuit").at("nSite");
     double circuit_dt=j.at("circuit").at("dt");
@@ -218,9 +219,9 @@ int main()
     cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites)* cx_double(1,0);
     auto cck=Fermionic::cc_matrix_kondo(sol1b.psi, sol1b.hamsys.sites);
 
-    cc.save("cc_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
-    cck.save("cck_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
-    rot.save("orb_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
+    if (save) cc.save("cc_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
+    if (save) cck.save("cck_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
+    if (save) rot.save("orb_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
 
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n"; cout.flush();
@@ -353,7 +354,7 @@ int main()
         cd=itensor::innerC(psi, cdOp(hip.ham.sites), psi).real();
         out<<(i+1)*abs(dt)<<" "<< maxLinkDim(hip.ham.ham) <<" "<<maxLinkDim(psi)<<" "<<0<<" "<<n0<<" "<<cd<<" "<<active.size()<<endl;
 
-        if (i>0 && i%100==0) {
+        if (save && (i>0) && (i%100==0)) {
             cc.save("cc_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
             cck.save("cck_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
             rot.save("orb_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
