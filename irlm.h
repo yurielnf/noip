@@ -323,8 +323,8 @@ struct IRLM_ip {
         }
 
         auto h=hImp;
-        for(auto i=0; i<sites.length(); i++)
-            for(auto j=0; j<sites.length(); j++)
+        for(auto i=0; i<3; i++) // We have 3 orbitals
+            for(auto j=0; j<3; j++)
             if (std::abs(Kip(i,j))>tolSv)
                 h += Kip(i,j),"Cdag",i+1,"C",j+1;
         auto mpo=itensor::toMPO(h);
