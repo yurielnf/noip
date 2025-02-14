@@ -126,7 +126,7 @@ int main()
 
     cout<<setw(4)<<j;
 
-    bool save=false;
+    bool save=j.value("save",false);
     bool verbose=j.at("verbose");
     IRLM m1 = j.at("irlm");
     int len=m1.L, nExclude=2;
@@ -167,9 +167,10 @@ int main()
     auto sys2b=model.Ham(rot);
     auto sol2b=computeGS(sys2b);
 
-    cc=Fermionic::cc_matrix(sol2b.psi, sol2b.hamsys.sites) * cx_double(1,0);
+    cc=Fermionic::cc_matrix(sol2b.psi, sol2b.hamsys.sites, len) * cx_double(1,0);
     if (save) cc.save("cc_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
     if (save) rot.save("orb_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
+
     int circuit_nImp=j.at("circuit").at("nImp");
     int circuit_nSite=j.at("circuit").at("nSite");
     double circuit_dt=j.at("circuit").at("dt");
@@ -201,7 +202,7 @@ int main()
     }
     auto sys1a=model0.Ham(rot);
     auto sol1a=computeGS(sys1a);
-    cc=Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites)* cx_double(1,0);
+    cc=Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites,len)* cx_double(1,0);
 
     //cc.save("cc_L"s+to_string(len)+"_gs1.txt",arma::raw_ascii);
     //rot.save("orb_L"s+to_string(len)+"_gs1.txt",arma::raw_ascii);
@@ -216,7 +217,7 @@ int main()
     }
     auto sys1b=model0.Ham(rot);
     auto sol1b=computeGS(sys1b);
-    cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites)* cx_double(1,0);
+    cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites,len)* cx_double(1,0);
     auto cck=Fermionic::cc_matrix_kondo(sol1b.psi, sol1b.hamsys.sites);
 
     if (save) cc.save("cc_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
@@ -315,8 +316,8 @@ int main()
         t0.mark();
 
 
-        cc=Fermionic::cc_matrix(psi, hip.ham.sites)* cx_double(1,0);
-        cck=Fermionic::cc_matrix_kondo(psi, hip.ham.sites)* cx_double(1,0);
+        cc.submat(0,0,hip.from,hip.from)=Fermionic::cc_matrix(psi, hip.ham.sites, hip.from)* cx_double(1,0);
+        if (save) cck.submat(0,0,hip.from,hip.from)=Fermionic::cc_matrix_kondo(psi, hip.ham.sites, hip.from)* cx_double(1,0);
         if (verbose) cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
 

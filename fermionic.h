@@ -143,9 +143,10 @@ struct Fermionic {
         return {sites, hk};
     }
 
-    static arma::cx_mat cc_matrix(itensor::MPS const& gs, itensor::Fermion const& sites)
+    static arma::cx_mat cc_matrix(itensor::MPS const& gs, itensor::Fermion const& sites, int L=-1)
     {
-        auto ccz=correlationMatrixC(gs, sites,"Cdag","C");
+        if (L==-1) L=sites.length();
+        auto ccz=correlationMatrixC(gs, sites,"Cdag","C",itensor::range(L));
         arma::cx_mat cc(ccz.size(), ccz.size());
         for(auto i=0u; i<ccz.size(); i++)
             for(auto j=0u; j<ccz[i].size(); j++)
@@ -153,7 +154,7 @@ struct Fermionic {
         return cc;
     }
 
-    static arma::cx_mat cc_matrix_kondo(itensor::MPS const& gs, itensor::Fermion const& sites)
+    static arma::cx_mat cc_matrix_kondo(itensor::MPS const& gs, itensor::Fermion const& sites, int L=-1)
     {
         itensor::MPS psi=gs;
         {// apply the excitation
@@ -163,7 +164,7 @@ struct Fermionic {
             psi.ref(1)=newA;
         }
         double norma=itensor::norm(psi);
-        return cc_matrix(psi, sites)*pow(norma,2);
+        return cc_matrix(psi, sites, L)*pow(norma,2);
     }
 
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
