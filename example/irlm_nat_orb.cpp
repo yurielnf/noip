@@ -167,7 +167,7 @@ int main()
     auto sys2b=model.Ham(rot);
     auto sol2b=computeGS(sys2b);
 
-    cc=Fermionic::cc_matrix(sol2b.psi, sol2b.hamsys.sites, len) * cx_double(1,0);
+    cc=Fermionic::cc_matrix(sol2b.psi, sol2b.hamsys.sites) * cx_double(1,0);
     if (save) cc.save("cc_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
     if (save) rot.save("orb_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
 
@@ -202,7 +202,7 @@ int main()
     }
     auto sys1a=model0.Ham(rot);
     auto sol1a=computeGS(sys1a);
-    cc=Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites,len)* cx_double(1,0);
+    cc=Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites)* cx_double(1,0);
 
     //cc.save("cc_L"s+to_string(len)+"_gs1.txt",arma::raw_ascii);
     //rot.save("orb_L"s+to_string(len)+"_gs1.txt",arma::raw_ascii);
@@ -217,7 +217,7 @@ int main()
     }
     auto sys1b=model0.Ham(rot);
     auto sol1b=computeGS(sys1b);
-    cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites,len)* cx_double(1,0);
+    cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites)* cx_double(1,0);
     auto cck=Fermionic::cc_matrix_kondo(sol1b.psi, sol1b.hamsys.sites);
 
     if (save) cc.save("cc_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
@@ -262,6 +262,12 @@ int main()
             auto op = itensor::toMPO(ampo);
             psi = applyMPO(op,psi);
             psi.replaceSiteInds(hip.ham.sites.inds());
+            cc.swap_cols(hip.from, hip.to);
+            cc.swap_rows(hip.from, hip.to);
+            if (save) {
+                cck.swap_cols(hip.from, hip.to);
+                cck.swap_rows(hip.from, hip.to);
+            }
         }
         // arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag()).print("ni when hip");
         if (nImpIp!=len) rot = rot * hip.rot;
@@ -316,8 +322,9 @@ int main()
         t0.mark();
 
 
-        cc.submat(0,0,hip.from,hip.from)=Fermionic::cc_matrix(psi, hip.ham.sites, hip.from)* cx_double(1,0);
-        if (save) cck.submat(0,0,hip.from,hip.from)=Fermionic::cc_matrix_kondo(psi, hip.ham.sites, hip.from)* cx_double(1,0);
+        // cc=Fermionic::cc_matrix(psi, hip.ham.sites);
+        cc.submat(0,0,hip.from,hip.from)=Fermionic::cc_matrix(psi, hip.ham.sites, hip.from+1)* cx_double(1,0);
+        if (save) cck.submat(0,0,hip.from,hip.from)=Fermionic::cc_matrix_kondo(psi, hip.ham.sites, hip.from+1)* cx_double(1,0);
         if (verbose) cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
 

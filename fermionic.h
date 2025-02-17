@@ -146,11 +146,11 @@ struct Fermionic {
     static arma::cx_mat cc_matrix(itensor::MPS const& gs, itensor::Fermion const& sites, int L=-1)
     {
         if (L==-1) L=sites.length();
-        auto ccz=correlationMatrixC(gs, sites,"Cdag","C",itensor::range(L));
+        auto ccz=correlationMatrixC(gs, sites,"Cdag","C",itensor::range1(L));
         arma::cx_mat cc(ccz.size(), ccz.size());
         for(auto i=0u; i<ccz.size(); i++)
             for(auto j=0u; j<ccz[i].size(); j++)
-                cc(i,j)=ccz[i][j];
+                cc(i,j)=ccz.at(i).at(j);
         return cc;
     }
 
