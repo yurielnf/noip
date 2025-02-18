@@ -322,15 +322,15 @@ struct IRLM_ip {
             // arma::abs(Kip-Kip2).eval().clean(1e-6).print("kip diff");
         }
 
-        auto h=hImp;
-        for(auto i=0; i<3; i++) // We have 3 orbitals
-            for(auto j=0; j<3; j++)
-            if (std::abs(Kip(i,j))>tolSv)
-                h += Kip(i,j),"Cdag",i+1,"C",j+1;
-        auto mpo=itensor::toMPO(h);
+        // auto h=hImp;
+        // for(auto i=0; i<3; i++) // We have 3 orbitals
+        //     for(auto j=0; j<3; j++)
+        //     if (std::abs(Kip(i,j))>tolSv)
+        //         h += Kip(i,j),"Cdag",i+1,"C",j+1;
+        // auto mpo=itensor::toMPO(h);
 
         // prepare the output
-        out.ham=HamSys{sites,mpo,mpo};
+        out.ham=HamSys{sites};
         out.Kip=Kip;
         out.givens=givens;
         return out;
