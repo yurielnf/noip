@@ -220,6 +220,7 @@ struct IRLM_ip {
     template<class T>
     HamIPOut<T> HamIP_f3(arma::Mat<T> const& rot, int nImp, arma::vec ni, double dt, bool extractf, double tolSv=1e-9) const
     {
+        itensor::cpu_time t0;
         if (nImp==rot.n_rows) return {Ham(rot),{},{}};
         HamIPOut<T> out;
 
@@ -236,6 +237,9 @@ struct IRLM_ip {
             Kip.submat(nImp, 0, rot.n_rows-1, nImp-1)+=K1.t();
         }
         out.rot=this->rotIP(rot,nImp,dt);
+
+        std::cout<<"Kip and rotIP:"<<t0.sincemark()<<std::endl;
+        t0.mark();
 
         int p0=L-1; {// the position before Slater starts
             for(; p0>=nImp; p0--)
@@ -298,6 +302,9 @@ struct IRLM_ip {
 
         }
 
+        std::cout<<"f0 and f1:"<<t0.sincemark()<<std::endl;
+        t0.mark();
+
         std::vector<GivensRot<T>> givens;
         if (extractf){// the circuit to extract f orbitals
             auto Kip2=Kip.eval();
@@ -321,6 +328,9 @@ struct IRLM_ip {
             // std::cout<<"\n is rot = "<<arma::norm(rot1.t()*rot1-arma::eye(arma::size(rot1)))<<"\n";
             // arma::abs(Kip-Kip2).eval().clean(1e-6).print("kip diff");
         }
+
+        std::cout<<"f final:"<<t0.sincemark()<<std::endl;
+        t0.mark();
 
         // auto h=hImp;
         // for(auto i=0; i<3; i++) // We have 3 orbitals
