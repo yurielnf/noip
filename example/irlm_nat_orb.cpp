@@ -265,7 +265,10 @@ int main()
 
         // cc=Fermionic::cc_matrix(psi, hip.ham.sites);
         cc.submat(0,0,hip.from,hip.from)=Fermionic::cc_matrix(psi, hip.ham.sites, hip.from+1)* cx_double(1,0);
-        if (save) cck.submat(0,0,hip.from,hip.from)=Fermionic::cc_matrix_kondo(psi, hip.ham.sites, hip.from+1)* cx_double(1,0);
+        if (save) {
+            cck=cc*cc(0,0);
+            cck.submat(0,0,hip.from,hip.from)=Fermionic::cc_matrix_kondo(psi, hip.ham.sites, hip.from+1)* cx_double(1,0);
+        }
         if (verbose) cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
 
