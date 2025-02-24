@@ -236,9 +236,12 @@ struct IRLM_ip {
             Kip.submat(0, nImp, nImp-1, rot.n_rows-1)+=K1;
             Kip.submat(nImp, 0, rot.n_rows-1, nImp-1)+=K1.t();
         }
-        out.rot=this->rotIP(rot,nImp,dt);
 
-        std::cout<<"Kip and rotIP:"<<t0.sincemark()<<std::endl;
+        std::cout<<"Kip:"<<t0.sincemark()<<std::endl;
+        t0.mark();
+
+        out.rot=this->rotIP(rot,nImp,dt);
+        std::cout<<"rotIP:"<<t0.sincemark()<<std::endl;
         t0.mark();
 
         int p0=L-1; {// the position before Slater starts
