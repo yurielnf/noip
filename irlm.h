@@ -104,8 +104,9 @@ struct IRLM_ip {
     itensor::Fermion sites;
     itensor::AutoMPO hImp;
     arma::mat K;
+    arma::cx_mat exp_ih;
 
-    explicit IRLM_ip(itensor::Fermion sites_, const IRLM& irlm_)
+    explicit IRLM_ip(itensor::Fermion sites_, const IRLM& irlm_, double dt)
         : irlm(irlm_)
         , sites(sites_)
         , hImp (sites)
@@ -118,6 +119,11 @@ struct IRLM_ip {
             for(auto j:impPos)
                 if (std::abs(Umat(i,j))>1e-15)
                     hImp += Umat(i,j),"N", i+1,"N", j+1;
+
+        using namespace arma;
+        int nImp=impPos.size();
+        exp_ih=arma::cx_mat(size(K), fill::eye);
+        exp_ih.submat(nImp,nImp, K.n_rows-1,K.n_rows-1)=expIH<double>(K.submat(nImp,nImp, K.n_rows-1,K.n_rows-1) * dt);
     }
 
     template<class T>
@@ -227,7 +233,7 @@ struct IRLM_ip {
         int L=rot.n_cols;
         arma::cx_mat  Kip; // interaction picture
         {
-            arma::Mat<T> K0=rot.t()*K*rot;
+            const auto& K0=K;
             arma::cx_mat K1 = K0.submat(0, nImp, nImp-1, rot.n_rows-1) *
                                K0.submat(nImp,nImp,rot.n_rows-1, rot.n_rows-1) * arma::cx_double(0,-0.5*dt); //the commutator
             Kip=K0 * arma::cx_double(1,0);
@@ -235,12 +241,16 @@ struct IRLM_ip {
             Kip.submat(0,0,nImp-1,nImp-1)=K0.submat(0,0,nImp-1,nImp-1) * arma::cx_double(1,0);
             Kip.submat(0, nImp, nImp-1, rot.n_rows-1)+=K1;
             Kip.submat(nImp, 0, rot.n_rows-1, nImp-1)+=K1.t();
+
+            // rot.t()*K*rot
+            Kip.rows(0,nImp-1)=Kip.rows(0,nImp-1).eval()*rot;
+            Kip.cols(0,nImp-1)=rot.t()*Kip.cols(0,nImp-1).eval();
         }
 
         std::cout<<"Kip:"<<t0.sincemark()<<std::endl;
         t0.mark();
 
-        out.rot=this->rotIP(rot,nImp,dt);
+        out.rot=this->exp_ih*rot; //this->rotIP(rot,nImp,dt);
         std::cout<<"rotIP:"<<t0.sincemark()<<std::endl;
         t0.mark();
 
@@ -262,10 +272,13 @@ struct IRLM_ip {
 
             if (out.from != out.to && out.to!=L){ // 2) swap sites in the Hamiltonian
                 std::swap(ni[out.from], ni[out.to]);
-                arma::cx_mat rot1(L, L, arma::fill::eye);
-                rot1.swap_cols(out.from, out.to);
-                Kip=(rot1.t()*Kip*rot1).eval();
-                out.rot=out.rot*rot1;                
+                // arma::cx_mat rot1(L, L, arma::fill::eye);
+                // rot1.swap_cols(out.from, out.to);
+                // Kip=(rot1.t()*Kip*rot1).eval();
+                // out.rot=out.rot*rot1;
+                Kip.swap_cols(out.from,out.to);
+                Kip.swap_rows(out.from,out.to);
+                out.rot.swap_cols(out.from,out.to);
             }
             // 3) extract f orbital of the sites with ni=0 and ni=1 independently
             arma::vec nSlater=ni.rows(p0+1,L-1).eval();
@@ -280,10 +293,13 @@ struct IRLM_ip {
                     arma::vec s;
                     arma::Mat<T> U, V;
                     svd(U,s,V,k12);
-                    arma::cx_mat rot1(L, L, arma::fill::eye);
-                    rot1.cols(pos0)=(rot1.cols(pos0).eval()*V).eval();
-                    Kip=(rot1.t()*Kip*rot1).eval();
-                    out.rot=out.rot*rot1;
+                    // arma::cx_mat rot1(L, L, arma::fill::eye);
+                    // rot1.cols(pos0)=(rot1.cols(pos0).eval()*V).eval();
+                    // Kip=(rot1.t()*Kip*rot1).eval();
+                    // out.rot=out.rot*rot1;
+                    Kip.cols(pos0)=Kip.cols(pos0).eval()*V;
+                    Kip.rows(pos0)=V.t()*Kip.rows(pos0).eval();
+                    out.rot.cols(pos0)=out.rot.cols(pos0)*V;
                     //arma::abs(Kip).eval().clean(1e-6).print("kip empty");
                 }
             }
@@ -295,10 +311,13 @@ struct IRLM_ip {
                     arma::vec s;
                     arma::Mat<T> U, V;
                     svd(U,s,V,k12);
-                    arma::cx_mat rot1(L, L, arma::fill::eye);
-                    rot1.cols(pos0)=(rot1.cols(pos0).eval()*V).eval();
-                    Kip=(rot1.t()*Kip*rot1).eval();
-                    out.rot=out.rot*rot1;
+                    // arma::cx_mat rot1(L, L, arma::fill::eye);
+                    // rot1.cols(pos0)=(rot1.cols(pos0).eval()*V).eval();
+                    // Kip=(rot1.t()*Kip*rot1).eval();
+                    // out.rot=out.rot*rot1;
+                    Kip.cols(pos0)=Kip.cols(pos0).eval()*V;
+                    Kip.rows(pos0)=V.t()*Kip.rows(pos0).eval();
+                    out.rot.cols(pos0)=out.rot.cols(pos0)*V;
                     //arma::abs(Kip).eval().clean(1e-6).print("kip full");
                 }
             }
@@ -322,10 +341,14 @@ struct IRLM_ip {
             //std::cout<<"nSV="<<nSv<<std::endl;
             givens=GivensRotForRot_left(arma::conj(V.head_cols(nSv)).eval());
             for(auto& g:givens) g.b+=nImp;
-            arma::cx_mat rot1(L, L, arma::fill::eye);
-            rot1.cols(0,p1)=rot1.cols(0,p1).eval() * matrot_from_Givens(givens, k12.n_cols+nImp).st();
-            Kip=(rot1.t()*Kip*rot1).eval();
-            out.rot = out.rot * rot1;
+            // arma::cx_mat rot1(L, L, arma::fill::eye);
+            // rot1.cols(0,p1)=rot1.cols(0,p1).eval() * matrot_from_Givens(givens, k12.n_cols+nImp).st();
+            // Kip=(rot1.t()*Kip*rot1).eval();
+            // out.rot = out.rot * rot1;
+            arma::cx_mat rot1=matrot_from_Givens(givens, k12.n_cols+nImp).st();
+            Kip.cols(0,p1)=Kip.cols(0,p1).eval()*rot1;
+            Kip.rows(0,p1)=rot1.t()*Kip.rows(0,p1).eval();
+            out.rot.cols(0,p1)=out.rot.cols(0,p1)*rot1;
             // V.head_cols(nSv).eval().clean(1e-6).print("V for f");
             // arma::cx_mat(rot1).clean(1e-6).print("rot1 for f");
             // std::cout<<"\n is rot = "<<arma::norm(rot1.t()*rot1-arma::eye(arma::size(rot1)))<<"\n";

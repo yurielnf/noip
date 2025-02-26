@@ -145,11 +145,13 @@ int main()
     int circuit_nSite=j.at("circuit").at("nSite");
     double circuit_dt=j.at("circuit").at("dt");
     double circuit_tol=j.at("circuit").at("tol");
+    double dt=j.at("tdvp").at("dt");
+
     IRLM m1 = j.at("irlm");
     int len=m1.L, nExclude=2;
     itensor::Fermion sites(len, {"ConserveNf",true});
-    auto model0=IRLM_ip {sites, j.at("irlm0")};
-    auto model=IRLM_ip {sites, j.at("irlm")};
+    auto model0=IRLM_ip {sites, j.at("irlm0"), dt};
+    auto model=IRLM_ip {sites, j.at("irlm"), dt};
 
     cout<<"\n-------------------------- solve the gs1 ----------------\n" << setprecision(15);
 
@@ -168,7 +170,6 @@ int main()
 
 
     cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n"; cout.flush();
-    double dt=j.at("tdvp").at("dt");
     double tolActivity=j.at("ip").at("tolActivity");
 
     ofstream out("irlm_no_L"s+to_string(len)+".txt");
@@ -211,7 +212,7 @@ int main()
             }
         }
         // arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag()).print("ni when hip");
-        if (nImpIp!=len) rot = rot * hip.rot;
+        if (nImpIp!=len) rot = hip.rot;
 //        if (nImpIp!=len) { rot = rot * matrot_from_Givens(givens,len).st();  }
         if (verbose) cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
@@ -275,7 +276,6 @@ int main()
         if (std::abs(i*dt-std::round(i*dt/circuit_dt)*circuit_dt) < 0.5*dt) {
             auto givens=Fermionic::NOGivensRot(cc,circuit_nImp,circuit_nSite,tolActivity, hip.from);
 //            auto givens=Fermionic::GivensRotForMatrix(cc,circuit_nImp,20);
-            auto rot1=matrot_from_Givens(givens,cc.n_rows);
             //real((rot1 * cc * rot1.t()).eval().clean(1e-10).submat(circuit_nImp,circuit_nImp,cc.n_rows-1,cc.n_cols-1)).print("rot1*cc*rot1.t()");
             auto gates=Fermionic::NOGates(hip.ham.sites,givens);
             if (verbose) cout<<"circuit1 algebra:"<<t0.sincemark()<<endl;
@@ -284,9 +284,14 @@ int main()
             t0.mark();
             //matriz ccr=Fermionic::cc_matrix(psi, sol.hamsys.sites);
             //real(ccr.clean(1e-7).submat(circuit_nImp,circuit_nImp,cc.n_rows-1,cc.n_cols-1)).print("cc after rot");
-            rot = rot*rot1.st();
-            cc=rot1*cc*rot1.t();
-            cck=rot1*cck*rot1.t();
+            auto rot1=matrot_from_Givens(givens,hip.from+1);
+            rot.cols(0,hip.from) = rot.cols(0,hip.from).eval()*rot1.st();
+            cc.cols(0,hip.from)=cc.cols(0,hip.from).eval()*rot1.t();
+            cc.rows(0,hip.from)=rot1*cc.rows(0,hip.from).eval();
+            if (save) {
+                cck.cols(0,hip.from)=cck.cols(0,hip.from).eval()*rot1.t();
+                cck.rows(0,hip.from)=rot1*cck.rows(0,hip.from).eval();
+            }
             //psi.orthogonalize({"Cutoff",circuit_tol});
             ni=arma::real(cc.diag());
             // ni=arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag());
