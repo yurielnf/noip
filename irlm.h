@@ -297,8 +297,12 @@ struct IRLM_ip {
                     // rot1.cols(pos0)=(rot1.cols(pos0).eval()*V).eval();
                     // Kip=(rot1.t()*Kip*rot1).eval();
                     // out.rot=out.rot*rot1;
-                    Kip.cols(pos0)=Kip.cols(pos0).eval()*V;
-                    Kip.rows(pos0)=V.t()*Kip.rows(pos0).eval();
+                    // Kip.cols(pos0)=Kip.cols(pos0).eval()*V;
+                    // Kip.rows(pos0)=V.t()*Kip.rows(pos0).eval();
+
+                    Kip.submat(posImp,pos0).fill(0);
+                    Kip.submat(0,pos0[0],nImp-1,pos0[0])=U*s.cols(0,0);
+                    Kip.submat(pos0,posImp)=Kip.submat(posImp,pos0).t();
                     out.rot.cols(pos0)=out.rot.cols(pos0)*V;
                     //arma::abs(Kip).eval().clean(1e-6).print("kip empty");
                 }
@@ -315,8 +319,12 @@ struct IRLM_ip {
                     // rot1.cols(pos0)=(rot1.cols(pos0).eval()*V).eval();
                     // Kip=(rot1.t()*Kip*rot1).eval();
                     // out.rot=out.rot*rot1;
-                    Kip.cols(pos0)=Kip.cols(pos0).eval()*V;
-                    Kip.rows(pos0)=V.t()*Kip.rows(pos0).eval();
+                    // Kip.cols(pos0)=Kip.cols(pos0).eval()*V;
+                    // Kip.rows(pos0)=V.t()*Kip.rows(pos0).eval();
+
+                    Kip.submat(posImp,pos0).fill(0);
+                    Kip.submat(0,pos0[0],nImp-1,pos0[0])=U*s.cols(0,0);
+                    Kip.submat(pos0,posImp)=Kip.submat(posImp,pos0).t();
                     out.rot.cols(pos0)=out.rot.cols(pos0)*V;
                     //arma::abs(Kip).eval().clean(1e-6).print("kip full");
                 }
