@@ -247,11 +247,11 @@ struct IRLM_ip {
             Kip.cols(0,nImp-1)=rot.t()*Kip.cols(0,nImp-1).eval();
         }
 
-        std::cout<<"Kip:"<<t0.sincemark()<<std::endl;
+        // std::cout<<"Kip:"<<t0.sincemark()<<std::endl;
         t0.mark();
 
         out.rot=this->exp_ih*rot; //this->rotIP(rot,nImp,dt);
-        std::cout<<"rotIP:"<<t0.sincemark()<<std::endl;
+        // std::cout<<"rotIP:"<<t0.sincemark()<<std::endl;
         t0.mark();
 
         int p0=L-1; {// the position before Slater starts
@@ -332,7 +332,7 @@ struct IRLM_ip {
 
         }
 
-        std::cout<<"f0 and f1:"<<t0.sincemark()<<std::endl;
+        // std::cout<<"f0 and f1:"<<t0.sincemark()<<std::endl;
         t0.mark();
 
         std::vector<GivensRot<T>> givens;
@@ -363,7 +363,7 @@ struct IRLM_ip {
             // arma::abs(Kip-Kip2).eval().clean(1e-6).print("kip diff");
         }
 
-        std::cout<<"f final:"<<t0.sincemark()<<std::endl;
+        // std::cout<<"f final:"<<t0.sincemark()<<std::endl;
         t0.mark();
 
         // auto h=hImp;
