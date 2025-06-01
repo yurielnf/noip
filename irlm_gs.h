@@ -1,6 +1,7 @@
 #ifndef IRLM_GS_H
 #define IRLM_GS_H
 
+#include "givens_rotation.h"
 #include <armadillo>
 #include <itensor/all.h>
 
@@ -150,6 +151,13 @@ private:
         arma::vec s;
         arma::mat U, V;
         svd(U,s,V, arma::mat{k12});
+        int nSv=arma::find(s>tol*s[0]).eval().size();
+        if (nSv>1) std::cout<<"nSV="<<nSv<<std::endl;
+        auto givens=GivensRotForRot_left(arma::conj(V.head_cols(nSv)).eval());
+        for(auto& g:givens) g.b+=p0;
+        arma::cx_mat rot1=matrot_from_Givens(givens, irlm.L).st();
+//        Kip.cols(0,p1)=Kip.cols(0,p1).eval()*rot1;
+//        Kip.rows(0,p1)=rot1.t()*Kip.rows(0,p1).eval();
     }
 };
 
