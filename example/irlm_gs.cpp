@@ -74,7 +74,6 @@ int main()
     using namespace itensor;
     using namespace arma;
     using namespace nlohmann;
-    using matriz=arma::cx_mat;
 
     json j;
     {
@@ -86,7 +85,7 @@ int main()
     IrlmData m1 = j.at("irlm_gs");
     int len=m1.L;
     itensor::Fermion sites(len, {"ConserveNf",true});
-    auto model0=Irlm_gs {sites, j.at("irlmgs")};
+    auto model0=Irlm_gs {j.at("irlm_gs")};
 
     return 0;
 }
