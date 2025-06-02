@@ -195,6 +195,24 @@ template<>
 GivensRot<cmpx> GivensRot<cmpx>::dagger() const { return {.b=b, .c=std::conj(c), .s=-s}; }
 
 template<class T>
+void applyGivensLeft(arma::SpMat<T>& A, GivensRot<T> const& g)
+{
+    auto Ar=A.rows(g.b,g.b+1).eval();
+    A.rows(g.b,g.b+1)=g.matrix().t()*Ar;
+}
+
+template<class T>
+void applyGivensRight(arma::SpMat<T>& A, GivensRot<T> const& g)
+{
+    auto Ac=A.cols(g.b,g.b+1).eval();
+    A.cols(g.b,g.b+1) = Ac * g.matrix();
+}
+
+
+//------------------------- set of Givens rotations -----------------------------------------
+
+
+template<class T>
 arma::Mat<T> matrot_from_Givens(std::vector<GivensRot<T>> const& gates, size_t n)
 {
     if (n==0) {
@@ -210,8 +228,6 @@ arma::Mat<T> matrot_from_Givens(std::vector<GivensRot<T>> const& gates, size_t n
     return rot;
 }
 
-
-//------------------------- set of Givens rotations -----------------------------------------
 
 /// return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
 /// the first column of the rotation will go to pos0,

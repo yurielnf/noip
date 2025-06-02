@@ -193,13 +193,13 @@ TEST_CASE("set of Givens")
         cx_mat x(len,len,fill::randu), U, V, rot(len,len,fill::eye);
         auto kin= (x.t()*x).eval();
         kin.submat(2,2,len-1,len-1).fill(0);
-        auto k12=conj(kin.submat(0,2,1,len-1).eval());
+        auto k12=kin.submat(0,2,1,len-1).eval();
         vec s;
         svd_econ(U,s,V,k12);
         auto givens=GivensRotForRot_left(V.head_cols(2).eval());
         rot.submat(2,2,len-1,len-1)=matrot_from_Givens(givens,V.n_rows);
         kin.print("kin");
-        (rot.st().t()*kin*rot.st()).eval().clean(1e-13).print("kin after rot f");
+        (rot*kin*rot.t()).eval().clean(1e-13).print("kin after rot f");
     }
 
 }

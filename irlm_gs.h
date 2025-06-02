@@ -155,7 +155,7 @@ private:
         if (nSv>1) std::cout<<"nSV="<<nSv<<std::endl;
         auto givens=GivensRotForRot_left(arma::conj(V.head_cols(nSv)).eval());
         for(auto& g:givens) g.b+=p0;
-        arma::cx_mat rot1=matrot_from_Givens(givens, irlm.L).st();
+        //arma::cx_mat rot1=matrot_from_Givens(givens, irlm.L).st();
 //        Kip.cols(0,p1)=Kip.cols(0,p1).eval()*rot1;
 //        Kip.rows(0,p1)=rot1.t()*Kip.rows(0,p1).eval();
     }
