@@ -190,25 +190,38 @@ TEST_CASE("set of Givens")
     SECTION("kin")
     {
         int len=8;
-        cx_mat x(len,len,fill::randu), U, V, rot(len,len,fill::eye);
-        auto kin= (x.t()*x).eval();
+        cx_mat x(len,len,fill::randu), U, V;
+        cx_mat kin= (x.t()*x).eval();
         kin.submat(2,2,len-1,len-1).fill(0);
         auto k12=kin.submat(0,2,1,len-1).eval();
         vec s;
         svd_econ(U,s,V,k12);
         auto givens=GivensRotForRot_left(V.head_cols(2).eval());
+        for(auto& g:givens) g.b+=2;
         GivensDaggerInPlace(givens);
-        rot.submat(2,2,len-1,len-1)=matrot_from_Givens(givens,V.n_rows);
+
         kin.print("kin");
-        (rot.t()*kin*rot).eval().clean(1e-13).print("kin after rot f");
+        SECTION("using global rot")
+        {
+            cx_mat rot(len,len,fill::eye);
+            rot=matrot_from_Givens(givens,len);
+            (rot.t()*kin*rot).eval().clean(1e-13).print("kin after rot f");
+        }
+        SECTION("using gates")
+        {
+            auto k1=kin;
+            applyGivens(k1,givens);
+            applyGivens(GivensDagger(givens),k1);
+            k1.clean(1e-13).print("kin after rot f with Givens");
+        }
     }
 
     SECTION( "sparse" )
     {
         int L=10;
-        arma::sp_mat A(L,L);
+        arma::mat A(L,L);
         A.diag().randn();
-        arma::mat(A).print("before Givens");
+        // arma::mat(A).print("before Givens");
         arma::mat U, V, k12(1,L-2,arma::fill::randu);
         vec s;
         svd(U,s,V,k12);
@@ -216,9 +229,9 @@ TEST_CASE("set of Givens")
         for(auto &g:givens) g.b+=2;
         //GivensDaggerInPlace(givens);
         for(auto &g:givens) {
-            std::cout<<"gate "<<g.b<<" "<<g.b+1<<std::endl;
+//            std::cout<<"gate "<<g.b<<" "<<g.b+1<<std::endl;
             applyGivens(g,A);
-            arma::mat(A).print("after Givens");
+//            arma::mat(A).print("after Givens");
         }
     }
 

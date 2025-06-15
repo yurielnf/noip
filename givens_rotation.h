@@ -195,14 +195,14 @@ template<>
 GivensRot<cmpx> GivensRot<cmpx>::dagger() const { return {.b=b, .c=std::conj(c), .s=-s}; }
 
 template<class T>
-void applyGivens(GivensRot<T> const& g, arma::SpMat<T>& A)
+void applyGivens(GivensRot<T> const& g, arma::Mat<T>& A)
 {
     auto Ar=A.rows(g.b,g.b+1).eval();
-    A.rows(g.b,g.b+1)=g.matrix().t()*Ar;
+    A.rows(g.b,g.b+1)=g.matrix()*Ar;
 }
 
 template<class T>
-void applyGivens(arma::SpMat<T>& A, GivensRot<T> const& g)
+void applyGivens(arma::Mat<T>& A, GivensRot<T> const& g)
 {
     auto Ac=A.cols(g.b,g.b+1).eval();
     A.cols(g.b,g.b+1) = Ac * g.matrix();
@@ -212,14 +212,14 @@ void applyGivens(arma::SpMat<T>& A, GivensRot<T> const& g)
 //------------------------- set of Givens rotations -----------------------------------------
 
 template<class T>
-void applyGivens(std::vector<GivensRot<T>> const& gs,arma::SpMat<T>& A)
+void applyGivens(std::vector<GivensRot<T>> const& gs,arma::Mat<T>& A)
 {
     for(auto const& g:gs)
         applyGivens(g,A);
 }
 
 template<class T>
-void applyGivens(arma::SpMat<T>& A, std::vector<GivensRot<T>> const& gs)
+void applyGivens(arma::Mat<T>& A, std::vector<GivensRot<T>> const& gs)
 {
     for(auto it=gs.crbegin(); it!=gs.crend(); ++it)
         applyGivens(A,*it);
@@ -283,5 +283,14 @@ void GivensDaggerInPlace(std::vector<GivensRot<T>> &givens)
     for(auto& g:givens) g=g.dagger();
     std::reverse(givens.begin(),givens.end());
 }
+
+template<class T>
+std::vector<GivensRot<T>> GivensDagger(std::vector<GivensRot<T>> const& givens)
+{
+    auto out=givens;
+    GivensDaggerInPlace(out);
+    return out;
+}
+
 
 #endif // GIVENS_ROTATION_H

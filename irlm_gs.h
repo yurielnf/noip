@@ -75,7 +75,7 @@ struct Irlm_gs {
         , K(irlm_.star_kin())
         , tol(tol_)
     {
-        prepareSlater(sites, arma::vec {K.diag()}, irlm.L/2);
+        prepareSlaterGs(sites, arma::vec {K.diag()}, irlm.L/2);
 
         std::vector<int> impPos={0,1};
         auto Umat=irlm.U_mat();
@@ -90,14 +90,14 @@ struct Irlm_gs {
         if (nActive+2 >= irlm.L) return; // there is no Slater
         arma::vec ni {cc.diag()};
         int p0=nActive;
-        prepareSlater_2site(ni,p0);
-        extract_f(ni,p0,true);
-        extract_f(ni,p0,false);
+        reorderSlater_2site(ni,p0);
+        extract_f(ni,p0,0.0);
+        extract_f(ni,p0,1.0);
 
         nActive+=2;
     }
 
-    void prepareSlater(itensor::Fermion const& sites, arma::vec ek, int nPart)
+    void prepareSlaterGs(itensor::Fermion const& sites, arma::vec ek, int nPart)
     {
         cc=arma::sp_mat(irlm.L, irlm.L);
         auto state = itensor::InitState(sites,"0");
@@ -115,12 +115,11 @@ struct Irlm_gs {
 
 private:
     /// the first two sites of the Slater will be |01> or |10>
-    void prepareSlater_2site(arma::vec& ni, int p0)
+    void reorderSlater_2site(arma::vec& ni, int p0)
     { // 1) find the first site where the occupation is not the one at p0
         int p1=p0+1;
-        auto isEmpty=[](double x){ return x<0.5; };  // helper function
         for(; p1<irlm.L; p1++)
-            if (isEmpty(ni[p1]) != isEmpty(ni[p0])) break;
+            if (std::abs(ni[p1]-ni[p0])>0.5) break;
 
         if (p1 != p0+1 && p1<irlm.L){ // 1a) swap sites in the Hamiltonian and in the state
             K.swap_cols(p1,p0+1);
@@ -140,12 +139,10 @@ private:
     }
 
     /// extract f orbital of the sites with ni=0 or 1
-    void extract_f(arma::vec const& ni, int p0, bool for_empty)
+    void extract_f(arma::vec const& ni, int p0, double nRef)
     {
-        arma::vec nSlater=ni.rows(p0,irlm.L-1).eval();
-        arma::uvec pos0= for_empty ?
-                    arma::find(nSlater<0.5).eval()+p0 :
-                    arma::find(nSlater>0.5).eval()+p0 ;
+        arma::vec nSlater=arma::abs(ni.rows(p0,irlm.L-1)-nRef).eval();
+        arma::uvec pos0=arma::find(nSlater<0.5).eval()+p0 ;
         if (pos0.empty()) return;
         auto k12 = K.rows(p0,p0+1).eval().cols(pos0);
         arma::vec s;
