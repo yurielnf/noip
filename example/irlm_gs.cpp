@@ -87,5 +87,10 @@ int main()
     itensor::Fermion sites(len, {"ConserveNf",true});
     auto model0=Irlm_gs {j.at("irlm_gs")};
 
+    model0.extractRepresentative(); cout<<"f\n";
+    model0.doDmrg(); cout<<"dmrg\n";
+    model0.rotateToNaturalOrbitals(); cout<<"NOrb\n";
+    cout<<"energy: "<<model0.energy<<endl;
+
     return 0;
 }

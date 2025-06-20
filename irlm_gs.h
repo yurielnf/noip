@@ -2,6 +2,8 @@
 #define IRLM_GS_H
 
 #include "givens_rotation.h"
+#include "fermionic.h"
+
 #include <armadillo>
 #include <itensor/all.h>
 
@@ -57,15 +59,24 @@ struct IrlmData {
     }
 };
 
+struct DmrgParams {
+    int max_bond_dim=512;
+    int nIter_diag=4;
+    double noise=1e-8;
+};
+
 struct Irlm_gs {
     IrlmData irlm;
     itensor::Fermion sites;
     itensor::AutoMPO hImp;
-    arma::sp_mat K;
-    itensor::MPS psi;
-    arma::sp_mat cc;
-    int nActive=2;
     double tol=1e-10;
+
+    /// these quantities are updated during the iterations
+    arma::mat K;
+    itensor::MPS psi;
+    double energy;
+    arma::mat cc;
+    int nActive=2;
 
 
     explicit Irlm_gs(const IrlmData& irlm_, double tol_=1e-10)
@@ -85,6 +96,13 @@ struct Irlm_gs {
                     hImp += Umat(i,j),"N", i+1,"N", j+1;
     }
 
+    void iterate(DmrgParams args={})
+    {
+        extractRepresentative();
+        doDmrg(args);
+        rotateToNaturalOrbitals();
+    }
+
     void extractRepresentative()
     {
         if (nActive+2 >= irlm.L) return; // there is no Slater
@@ -93,8 +111,46 @@ struct Irlm_gs {
         reorderSlater_2site(ni,p0);
         extract_f(ni,p0,0.0);
         extract_f(ni,p0,1.0);
-
         nActive+=2;
+    }
+
+    void doDmrg(DmrgParams args={})
+    {
+        auto h=hImp;
+        for(auto i=0; i<nActive; i++)
+            for(auto j=0; j<nActive; j++)
+            if (std::abs(K(i,j))>tol)
+                h += K(i,j),"Cdag",i+1,"C",j+1;
+        auto mpo=itensor::toMPO(h);
+
+        auto sweeps = itensor::Sweeps(1);
+        sweeps.maxdim() = args.max_bond_dim;
+        sweeps.cutoff() = tol;
+        sweeps.niter() = args.nIter_diag;
+        sweeps.noise() = args.noise;
+        energy=itensor::dmrg(psi,mpo,sweeps, {"Quiet", true, "Silent", true});
+        energy += SlaterEnergy();
+
+        auto ccz=correlationMatrix(psi, sites,"Cdag","C",itensor::range1(nActive));
+        for(auto i=0u; i<ccz.size(); i++)
+            for(auto j=0u; j<ccz[i].size(); j++)
+                cc(i,j)=ccz.at(i).at(j);
+    }
+
+    void rotateToNaturalOrbitals()
+    {
+        auto cc1=cc.submat(2,2,nActive-1, nActive-1).eval();
+        auto givens=GivensRotForCC_right(cc1);
+        for(auto& g:givens) g.b+=2;
+        auto gates=Fermionic::NOGates(sites,givens);
+        gateTEvol(gates,1,1,psi,{"Cutoff",tol,"Quiet",true, "Normalize",false,"ShowPercent",false});
+        auto rot1=matrot_from_Givens(givens,nActive);
+        cc.cols(0,nActive-1)=cc.cols(0,nActive-1).eval()*rot1.t();
+        cc.rows(0,nActive-1)=rot1*cc.rows(0,nActive-1).eval();
+        K.cols(0,nActive-1)=K.cols(0,nActive-1).eval()*rot1.st();
+        K.rows(0,nActive-1)=rot1.st().t()*K.rows(0,nActive-1).eval();
+        auto nib=arma::real(cc.diag()).eval().rows(2,irlm.L);
+        nActive=arma::find(nib>tol && nib<1-tol).eval().size()+2;
     }
 
     void prepareSlaterGs(itensor::Fermion const& sites, arma::vec ek, int nPart)
@@ -111,6 +167,14 @@ struct Irlm_gs {
         }
         std::cout << " Slater energy: " << energy << std::endl;
         psi=itensor::MPS(state);
+    }
+
+    double SlaterEnergy()
+    {
+        double energy=0;
+        for(auto i=nActive; i<irlm.L; i++)
+            energy += cc(i,i)*K(i,i);
+        return energy;
     }
 
 private:
@@ -152,9 +216,10 @@ private:
         if (nSv>1) std::cout<<"nSV="<<nSv<<std::endl;
         auto givens=GivensRotForRot_left(arma::conj(V.head_cols(nSv)).eval());
         for(auto& g:givens) g.b+=p0;
-        //arma::cx_mat rot1=matrot_from_Givens(givens, irlm.L).st();
-//        Kip.cols(0,p1)=Kip.cols(0,p1).eval()*rot1;
-//        Kip.rows(0,p1)=rot1.t()*Kip.rows(0,p1).eval();
+        GivensDaggerInPlace(givens);
+        applyGivens(K,givens);
+        applyGivens(GivensDagger(givens),K);
+        // no need to update cc
     }
 };
 
