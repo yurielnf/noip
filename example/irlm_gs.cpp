@@ -16,12 +16,13 @@ struct State {
     itensor::Fermion sites;
 };
 
-auto computeGS(HamSys const& sys)
+auto computeGS(itensor::Fermion const& sites, itensor::MPO const& ham)
 {
-    cout<<"bond dimension of H: "<< maxLinkDim(sys.ham) << endl;
-    it_dmrg sol_gs {sys};
+    cout<<"bond dimension of H: "<< maxLinkDim(ham) << endl;
+    it_dmrg sol_gs {HamSys{.sites=sites,.ham=ham}};
     sol_gs.bond_dim=64;
     sol_gs.noise=1e-3;
+    sol_gs.silent=false;
     cout<<"\nsweep bond-dim energy\n";
     for(auto i=0u; i<30; i++) {
         if (i==10) { sol_gs.noise=1e-7; sol_gs.bond_dim=256; }
@@ -91,6 +92,9 @@ int main()
     model0.doDmrg(); cout<<"dmrg\n";
     model0.rotateToNaturalOrbitals(); cout<<"NOrb\n";
     cout<<"energy: "<<model0.energy<<endl;
+
+    cout<<"normal dmrg\n";
+    computeGS(sites,model0.fullHamiltonian());
 
     return 0;
 }

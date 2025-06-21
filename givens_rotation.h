@@ -315,6 +315,7 @@ std::vector<GivensRot<T>> GivensRotForCC_right(arma::Mat<T> cc, int pfinal=-1)
         }
         auto rot1=matrot_from_Givens(gs1,p2+1);
         cc.submat(0,0,p2,p2)=rot1*cc.submat(0,0,p2,p2)*rot1.t();
+        for(auto g : gs1) givens.push_back(g);
     }
     return givens;
 }

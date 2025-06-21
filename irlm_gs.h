@@ -149,7 +149,7 @@ struct Irlm_gs {
         cc.rows(0,nActive-1)=rot1*cc.rows(0,nActive-1).eval();
         K.cols(0,nActive-1)=K.cols(0,nActive-1).eval()*rot1.st();
         K.rows(0,nActive-1)=rot1.st().t()*K.rows(0,nActive-1).eval();
-        auto nib=arma::real(cc.diag()).eval().rows(2,irlm.L);
+        auto nib=arma::real(cc.diag()).eval().rows(2,irlm.L-1).eval();
         nActive=arma::find(nib>tol && nib<1-tol).eval().size()+2;
     }
 
@@ -175,6 +175,16 @@ struct Irlm_gs {
         for(auto i=nActive; i<irlm.L; i++)
             energy += cc(i,i)*K(i,i);
         return energy;
+    }
+
+    itensor::MPO fullHamiltonian() const
+    {
+        auto h=hImp;
+        for(auto i=0; i<irlm.L; i++)
+            for(auto j=0; j<irlm.L; j++)
+            if (std::abs(K(i,j))>tol)
+                h += K(i,j),"Cdag",i+1,"C",j+1;
+        return itensor::toMPO(h);
     }
 
 private:
@@ -208,10 +218,10 @@ private:
         arma::vec nSlater=arma::abs(ni.rows(p0,irlm.L-1)-nRef).eval();
         arma::uvec pos0=arma::find(nSlater<0.5).eval()+p0 ;
         if (pos0.empty()) return;
-        auto k12 = K.rows(p0,p0+1).eval().cols(pos0);
+        auto k12 = K.rows(p0,p0+1).eval().cols(pos0).eval();
         arma::vec s;
         arma::mat U, V;
-        svd(U,s,V, arma::mat{k12});
+        svd(U,s,V, k12);
         int nSv=arma::find(s>tol*s[0]).eval().size();
         if (nSv>1) std::cout<<"nSV="<<nSv<<std::endl;
         auto givens=GivensRotForRot_left(arma::conj(V.head_cols(nSv)).eval());
