@@ -16,15 +16,16 @@ struct State {
     itensor::Fermion sites;
 };
 
-auto computeGS(itensor::Fermion const& sites, itensor::MPO const& ham)
+auto computeGS(itensor::Fermion const& sites, itensor::MPO const& ham, itensor::MPS *psi=nullptr)
 {
     cout<<"bond dimension of H: "<< maxLinkDim(ham) << endl;
-    it_dmrg sol_gs {HamSys{.sites=sites,.ham=ham}};
+    it_dmrg sol_gs = psi ? it_dmrg {HamSys{.sites=sites,.ham=ham}, *psi} :
+                           it_dmrg {HamSys{.sites=sites,.ham=ham}};
     sol_gs.bond_dim=64;
     sol_gs.noise=1e-3;
-    sol_gs.silent=false;
+    sol_gs.silent=true;
     cout<<"\nsweep bond-dim energy\n";
-    for(auto i=0u; i<30; i++) {
+    for(auto i=0u; i<32; i++) {
         if (i==10) { sol_gs.noise=1e-7; sol_gs.bond_dim=256; }
         else if (i==26) { sol_gs.noise=1e-9; sol_gs.bond_dim=512; }
         else if (i==28) sol_gs.noise=0;
@@ -83,18 +84,32 @@ int main()
         j=json::parse(in);
     }
 
-    IrlmData m1 = j.at("irlm_gs");
-    int len=m1.L;
-    itensor::Fermion sites(len, {"ConserveNf",true});
     auto model0=Irlm_gs {j.at("irlm_gs")};
 
-    model0.extractRepresentative(); cout<<"f\n";
-    model0.doDmrg(); cout<<"dmrg\n";
-    model0.rotateToNaturalOrbitals(); cout<<"NOrb\n";
-    cout<<"energy: "<<model0.energy<<endl;
+    auto ev1=arma::eig_sym(model0.irlm.kin_mat());
+    auto ev2=arma::eig_sym(model0.irlm.star_kin());
+    cout<<"kin-kin_star "<<arma::norm(ev1-ev2)<<endl;
 
-    cout<<"normal dmrg\n";
-    computeGS(sites,model0.fullHamiltonian());
+
+    auto print_mps=[&]() {
+        for(auto i=0; i<model0.psi.length(); i++)
+            cout<<itensor::leftLinkIndex(model0.psi,i+1).dim()<<" ";
+        cout << "\n";
+    };
+
+    print_mps();
+    for(auto i=0;i<20;i++){
+        model0.extractRepresentative();
+        print_mps();
+        model0.doDmrg();
+        print_mps();
+        model0.rotateToNaturalOrbitals();
+        print_mps();
+        cout<<i<<" "<<model0.nActive<<" "<<model0.energy<<endl;
+    }
+
+    cout<<"\n\nNormal dmrg\n";
+    computeGS(model0.sites,model0.fullHamiltonian(false), &model0.psi);
 
     return 0;
 }

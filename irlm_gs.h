@@ -16,9 +16,9 @@ struct IrlmData {
     bool connected=true;
 
     /// Kinetic energy matrix
-    arma::sp_mat kin_mat() const
+    arma::mat kin_mat() const
     {
-        arma::sp_mat K(L,L);
+        arma::mat K(L,L, arma::fill::zeros);
         for(auto i=1+!connected; i<L-1; i++)
             K(i,i+1)=K(i+1,i)=t;
         K(0,1)=K(1,0)=V;
@@ -32,15 +32,15 @@ struct IrlmData {
     }
 
     /// U ni nj
-    arma::sp_mat U_mat() const
+    arma::mat U_mat() const
     {
-        arma::sp_mat Umat(2,2);
+        arma::mat Umat(2,2,arma::fill::zeros);
         Umat(0,1)=U;
         return Umat;
     }
 
-    /// Kinetic enery coeff in star geometry (Hbath is diagonal)
-    arma::sp_mat star_kin() const
+    /// Kinetic energy coeff in star geometry (Hbath is diagonal)
+    arma::mat star_kin() const
     {
         auto K=kin_mat();
         arma::mat Kbath=arma::mat {K.submat(2,2,L-1,L-1).eval()};
@@ -49,11 +49,11 @@ struct IrlmData {
         arma::eig_sym(ek,evec,Kbath);
         arma::vec vk=(K.submat(1,2,1,L-1)*evec).as_col();
 
-        arma::sp_mat Kstar(L,L);
+        arma::mat Kstar(L,L,arma::fill::zeros);
         Kstar.submat(0,0,1,1)=K.submat(0,0,1,1);
         for(auto i=0u;i<ek.size();i++) {
             Kstar(i+2,i+2)=ek[i];
-            Kstar(1,i+2)=vk[i];
+            Kstar(1,i+2)=Kstar(i+2,1)=vk[i];
         }
         return Kstar;
     }
@@ -74,7 +74,7 @@ struct Irlm_gs {
     /// these quantities are updated during the iterations
     arma::mat K;
     itensor::MPS psi;
-    double energy;
+    double energy=-1000;
     arma::mat cc;
     int nActive=2;
 
@@ -83,8 +83,8 @@ struct Irlm_gs {
         : irlm(irlm_)
         , sites(itensor::Fermion(irlm.L, {"ConserveNf",true}))
         , hImp (sites)
-        , K(irlm_.star_kin())
         , tol(tol_)
+        , K(irlm_.star_kin())
     {
         prepareSlaterGs(sites, arma::vec {K.diag()}, irlm.L/2);
 
@@ -123,13 +123,18 @@ struct Irlm_gs {
                 h += K(i,j),"Cdag",i+1,"C",j+1;
         auto mpo=itensor::toMPO(h);
 
-        auto sweeps = itensor::Sweeps(1);
+        auto sweeps = itensor::Sweeps(2);
         sweeps.maxdim() = args.max_bond_dim;
         sweeps.cutoff() = tol;
         sweeps.niter() = args.nIter_diag;
         sweeps.noise() = args.noise;
-        energy=itensor::dmrg(psi,mpo,sweeps, {"Quiet", true, "Silent", true});
+        energy=itensor::dmrg(psi,mpo,sweeps, {"MaxSite",nActive,"Quiet", true, "Silent", true});
+        psi.normalize();
+        energy=itensor::inner(psi,mpo,psi);
         energy += SlaterEnergy();
+        std::cout<<" "<<energy<<" ";
+
+        energy=itensor::inner(psi,fullHamiltonian(false),psi);
 
         auto ccz=correlationMatrix(psi, sites,"Cdag","C",itensor::range1(nActive));
         for(auto i=0u; i<ccz.size(); i++)
@@ -155,7 +160,7 @@ struct Irlm_gs {
 
     void prepareSlaterGs(itensor::Fermion const& sites, arma::vec ek, int nPart)
     {
-        cc=arma::sp_mat(irlm.L, irlm.L);
+        cc=arma::mat(irlm.L, irlm.L, arma::fill::zeros);
         auto state = itensor::InitState(sites,"0");
         arma::uvec iek=arma::sort_index(ek);
         double energy=0;
@@ -177,13 +182,14 @@ struct Irlm_gs {
         return energy;
     }
 
-    itensor::MPO fullHamiltonian() const
+    itensor::MPO fullHamiltonian(bool real_space=true) const
     {
+        auto kin= real_space ? irlm.kin_mat() : K;
         auto h=hImp;
         for(auto i=0; i<irlm.L; i++)
             for(auto j=0; j<irlm.L; j++)
-            if (std::abs(K(i,j))>tol)
-                h += K(i,j),"Cdag",i+1,"C",j+1;
+            if (std::abs(kin(i,j))>tol)
+                h += kin(i,j),"Cdag",i+1,"C",j+1;
         return itensor::toMPO(h);
     }
 
