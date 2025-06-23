@@ -105,13 +105,12 @@ struct Irlm_gs {
 
     void extractRepresentative()
     {
-        if (nActive+2 >= irlm.L) return; // there is no Slater
+        if (nActive >= irlm.L) return; // there is no Slater
         arma::vec ni {cc.diag()};
         int p0=nActive;
         reorderSlater_2site(ni,p0);
         extract_f(ni,p0,0.0);
         extract_f(ni,p0,1.0);
-        nActive+=2;
     }
 
     void doDmrg(DmrgParams args={})
@@ -123,18 +122,18 @@ struct Irlm_gs {
                 h += K(i,j),"Cdag",i+1,"C",j+1;
         auto mpo=itensor::toMPO(h);
 
-        auto sweeps = itensor::Sweeps(2);
+        auto sweeps = itensor::Sweeps(1);
         sweeps.maxdim() = args.max_bond_dim;
         sweeps.cutoff() = tol;
         sweeps.niter() = args.nIter_diag;
         sweeps.noise() = args.noise;
         energy=itensor::dmrg(psi,mpo,sweeps, {"MaxSite",nActive,"Quiet", true, "Silent", true});
-        psi.normalize();
-        energy=itensor::inner(psi,mpo,psi);
+        //psi.normalize();
+        // energy=itensor::inner(psi,mpo,psi);
         energy += SlaterEnergy();
-        std::cout<<" "<<energy<<" ";
+        //std::cout<<" "<<energy<<" ";
 
-        energy=itensor::inner(psi,fullHamiltonian(false),psi);
+        //energy=itensor::inner(psi,fullHamiltonian(false),psi);
 
         auto ccz=correlationMatrix(psi, sites,"Cdag","C",itensor::range1(nActive));
         for(auto i=0u; i<ccz.size(); i++)
@@ -149,6 +148,7 @@ struct Irlm_gs {
         for(auto& g:givens) g.b+=2;
         auto gates=Fermionic::NOGates(sites,givens);
         gateTEvol(gates,1,1,psi,{"Cutoff",tol,"Quiet",true, "Normalize",false,"ShowPercent",false});
+        // psi.orthogonalize({"Cutoff",tol});
         auto rot1=matrot_from_Givens(givens,nActive);
         cc.cols(0,nActive-1)=cc.cols(0,nActive-1).eval()*rot1.t();
         cc.rows(0,nActive-1)=rot1*cc.rows(0,nActive-1).eval();
@@ -161,6 +161,8 @@ struct Irlm_gs {
     void prepareSlaterGs(itensor::Fermion const& sites, arma::vec ek, int nPart)
     {
         cc=arma::mat(irlm.L, irlm.L, arma::fill::zeros);
+        ek[0]=-10; // force ocupation |10>
+        ek[1]=10;
         auto state = itensor::InitState(sites,"0");
         arma::uvec iek=arma::sort_index(ek);
         double energy=0;
@@ -223,19 +225,24 @@ private:
     {
         arma::vec nSlater=arma::abs(ni.rows(p0,irlm.L-1)-nRef).eval();
         arma::uvec pos0=arma::find(nSlater<0.5).eval()+p0 ;
-        if (pos0.empty()) return;
-        auto k12 = K.rows(p0,p0+1).eval().cols(pos0).eval();
+        if (pos0.empty()) { std::cout<<"warning: no slater?\n"; return; }
+        auto k12 = K.head_rows(p0).eval().cols(pos0).eval();
         arma::vec s;
         arma::mat U, V;
         svd(U,s,V, k12);
         int nSv=arma::find(s>tol*s[0]).eval().size();
-        if (nSv>1) std::cout<<"nSV="<<nSv<<std::endl;
+        if (nSv>1) s.head_rows(nSv).as_row().print("-->singular values");
         auto givens=GivensRotForRot_left(arma::conj(V.head_cols(nSv)).eval());
-        for(auto& g:givens) g.b+=p0;
+        //for(auto& g:givens) g.b+=p0;
         GivensDaggerInPlace(givens);
-        applyGivens(K,givens);
-        applyGivens(GivensDagger(givens),K);
+        auto Kcol=K.cols(pos0).eval();
+        applyGivens(Kcol,givens);
+        K.cols(pos0)=Kcol;
+        auto Krow=K.rows(pos0).eval();
+        applyGivens(GivensDagger(givens),Krow);
+        K.rows(pos0)=Krow;
         // no need to update cc
+        nActive += nSv;
     }
 };
 
