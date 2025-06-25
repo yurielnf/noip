@@ -72,9 +72,7 @@ auto prepareSlater(itensor::Fermion const& sites, arma::vec ek, int nPart)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IrlmData,L,t,V,U,ed,connected)
 
 int main()
-{
-    using namespace itensor;
-    using namespace arma;
+{    
     using namespace nlohmann;
 
     json j;
@@ -84,47 +82,21 @@ int main()
         j=json::parse(in);
     }
 
+    itensor::cpu_time t0;
+    t0.mark();
     auto model0=Irlm_gs {j.at("irlm_gs")};
+    cout<<"initialization: "<<t0.sincemark().wall<<endl;
+    t0.mark();
 
-    auto ev1=arma::eig_sym(model0.irlm.kin_mat());
-    auto ev2=arma::eig_sym(model0.irlm.star_kin());
-    cout<<setprecision(12)<<"kin-kin_star "<<arma::norm(ev1-ev2)<<endl;
-
-
-    auto print_status=[&](string msg="") {
-        model0.cc.diag().as_row().print(msg+": ni");
-        // arma::mat(model0.K).clean(1e-12).print("K");
-        for(auto i=0; i<model0.psi.length(); i++)
-            cout<<itensor::leftLinkIndex(model0.psi,i+1).dim()<<" ";
-        cout << "\n";
-        // auto ev2=arma::eig_sym(model0.K);
-        // cout<<"kin-kin_star "<<arma::norm(ev1-ev2)<<endl;
-    };
-
-    print_status("beginning");
-    for(auto i=0;i<20;i++){
-        model0.extractRepresentative();
-        // model0.K.print("after f");
-        // print_status("after extract f");
-        model0.doDmrg();
-        print_status("after dmrg");
-        model0.rotateToNaturalOrbitals();
-        print_status("after nat orb");
-        // model0.K.print("K");
-        cout<<i<<" "<<model0.nActive<<" "<<model0.energy<<endl;
+    cout<<"iteration nActive energy time\n"<<setprecision(12);
+    for(auto i=0;i<30;i++){
+        model0.iterate();
+        cout<<i+1<<" "<<model0.nActive<<" "<<model0.energy<<" "<<t0.sincemark().wall<<endl;
+        t0.mark();
     }
 
-    cout<<"\n\nNormal dmrg\n";
-    auto sol_gs=computeGS(model0.sites,model0.fullHamiltonian(false), &model0.psi);
-    model0.psi=sol_gs.psi;
-    model0.nActive=model0.irlm.L;
-    model0.cc=arma::real(Fermionic::cc_matrix(model0.psi,model0.sites));
-    print_status("after classical dmrg");
-    model0.rotateToNaturalOrbitals();
-    print_status("after nat orb");
-    model0.doDmrg();
-    print_status("after dmrg");
-    cout<<model0.nActive<<" "<<model0.energy<<endl;
+    // cout<<"\n\nNormal dmrg\n";
+    //auto sol_gs=computeGS(model0.sites,model0.fullHamiltonian(true));
 
     return 0;
 }

@@ -238,13 +238,12 @@ void applyGivens(arma::Mat<T>& A, std::vector<GivensRot<T>> const& gs)
 template<class T>
 arma::Mat<T> matrot_from_Givens(std::vector<GivensRot<T>> const& gates, size_t n)
 {
-    if (n==0) {
+    if (n==0) { // read the length from the gates
         for(const GivensRot<T>& g : gates) if (g.b>n) n=g.b;
         n+=2;
     }
     arma::Mat<T> rot(n,n, arma::fill::eye);
     for(int i=gates.size()-1; i>=0; i--) { // apply to the right in reverse
-//    for(auto i=0u; i<gates.size(); i++) {
         const GivensRot<T>& g=gates[i];
         rot.cols(g.b,g.b+1) = rot.cols(g.b,g.b+1).eval() * g.matrix();
     }
@@ -252,14 +251,10 @@ arma::Mat<T> matrot_from_Givens(std::vector<GivensRot<T>> const& gates, size_t n
 }
 
 
-/// return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
-/// the first column of the rotation will go to pos0,
-/// the second to pos0+1, and so on.
+/// generate the corresponding Givens rotations: every column is one layer of gates
 template<class T>
 static std::vector<GivensRot<T>> GivensRotForRot_left(arma::Mat<T> rot)
 {
-    //if (pos0+rot.n_cols>rot.n_rows) throw std::invalid_argument("GivensRotForRot: position outside the matrix");
-    using namespace arma;
     std::vector<GivensRot<T>> givens;
     for(int j=0u; j<rot.n_cols; j++) {
         arma::Col<T> v=rot.col(j);
@@ -269,21 +264,9 @@ static std::vector<GivensRot<T>> GivensRotForRot_left(arma::Mat<T> rot)
             auto g=GivensRot<T>::createFromPair(i,v[i],v[i+1], false, &v[i]);
             gs1.push_back(g);
         }
-        // if constexpr (std::is_same_v<cmpx,T>)
-        //         if (!gs1.empty())
-        //             gs1.back()=gs1.back()*v[j]; // to remove the phase
-        //auto rot1=matrot_from_Givens(gs1, rot.n_rows);
-        //arma::Mat<T> rotn = rot1*rot; //.cols(j,rot.n_cols-1) could start from j+1
-        //rot=rotn;
         applyGivens(gs1,rot);
         for(auto g : gs1) givens.push_back(g);
-
-
-        // v.clean(1e-15).print("v");
-        // rot.clean(1e-15).print("rot");
-        // rot1.clean(1e-15).print("rot1");
     }
-    //rot.clean(1e-15).print("rot after extracting the Givens rotations");
     return givens;
 }
 

@@ -41,9 +41,6 @@ struct it_dmrg {
         sweeps.niter() = nIter_diag;
         sweeps.noise() = noise;
         energy=itensor::dmrg(psi,hamsys.ham,sweeps, {"Quiet", true, "Silent", silent, "DoNormalize", true});
-        std::cout<<" "<<energy<<" ";
-        psi.normalize();
-        energy=itensor::inner(psi,hamsys.ham,psi);
         nsweep++;
     }
 };

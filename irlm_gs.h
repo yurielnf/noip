@@ -98,19 +98,39 @@ struct Irlm_gs {
 
     void iterate(DmrgParams args={})
     {
-        extractRepresentative();
+        extract_f(0.0);
+        extract_f(1.0);
         doDmrg(args);
         rotateToNaturalOrbitals();
     }
 
-    void extractRepresentative()
+    /// extract f orbital of the sites with ni=0 or 1
+    void extract_f(double nRef)
     {
-        if (nActive >= irlm.L) return; // there is no Slater
-        arma::vec ni {cc.diag()};
-        int p0=nActive;
-        reorderSlater_2site(ni,p0);
-        extract_f(ni,p0,0.0);
-        extract_f(ni,p0,1.0);
+        arma::vec ni=cc.diag();
+        arma::vec nSlater=arma::abs(ni.rows(nActive,irlm.L-1)-nRef).eval();
+        arma::uvec pos0=arma::find(nSlater<0.5).eval()+nActive ;
+        if (pos0.empty()) { std::cout<<"warning: no slater?\n"; return; }
+        auto k12 = K.head_rows(nActive).eval().cols(pos0).eval();
+        arma::vec s;
+        arma::mat U, V;
+        svd(U,s,V, k12);
+        int nSv=arma::find(s>tol*s[0]).eval().size();
+        // if (nSv>1) s.head_rows(nSv).as_row().print("-->singular values");
+        auto givens=GivensRotForRot_left(arma::conj(V.head_cols(nSv)).eval());
+        //for(auto& g:givens) g.b+=p0;
+        GivensDaggerInPlace(givens);
+        auto Kcol=K.cols(pos0).eval();
+        applyGivens(Kcol,givens);
+        K.cols(pos0)=Kcol;
+        auto Krow=K.rows(pos0).eval();
+        applyGivens(GivensDagger(givens),Krow);
+        K.rows(pos0)=Krow;
+        // no need to update cc
+        for(auto i=0; i<nSv; i++) {
+            SlaterSwap(nActive,pos0.at(i));
+            nActive++;
+        }
     }
 
     void doDmrg(DmrgParams args={})
@@ -172,7 +192,7 @@ struct Irlm_gs {
             energy += ek[k];
             cc(k,k)=1;
         }
-        std::cout << " Slater energy: " << energy << std::endl;
+        // std::cout << " Slater energy: " << energy << std::endl;
         psi=itensor::MPS(state);
     }
 
@@ -196,54 +216,45 @@ struct Irlm_gs {
     }
 
 private:
-    /// the first two sites of the Slater will be |01> or |10>
-    void reorderSlater_2site(arma::vec& ni, int p0)
-    { // 1) find the first site where the occupation is not the one at p0
-        int p1=p0+1;
-        for(; p1<irlm.L; p1++)
-            if (std::abs(ni[p1]-ni[p0])>0.5) break;
 
-        if (p1 != p0+1 && p1<irlm.L){ // 1a) swap sites in the Hamiltonian and in the state
-            K.swap_cols(p1,p0+1);
-            K.swap_rows(p1,p0+1);
-
-            cc.swap_cols(p1,p0+1);
-            cc.swap_rows(p1,p0+1);
-            std::swap(ni[p1],ni[p0+1]);
-
-            itensor::AutoMPO ampo(sites);
-            ampo += "Cdag",p1+1,"C",p0+2;
-            ampo += "Cdag",p0+2, "C",p1+1;
-            auto op = itensor::toMPO(ampo);
-            psi = applyMPO(op,psi);
-            psi.replaceSiteInds(sites.inds());
-        }
-    }
-
-    /// extract f orbital of the sites with ni=0 or 1
-    void extract_f(arma::vec const& ni, int p0, double nRef)
+    /// Swap to sites inside the Slater part
+    void SlaterSwap(int i,int j)
     {
-        arma::vec nSlater=arma::abs(ni.rows(p0,irlm.L-1)-nRef).eval();
-        arma::uvec pos0=arma::find(nSlater<0.5).eval()+p0 ;
-        if (pos0.empty()) { std::cout<<"warning: no slater?\n"; return; }
-        auto k12 = K.head_rows(p0).eval().cols(pos0).eval();
-        arma::vec s;
-        arma::mat U, V;
-        svd(U,s,V, k12);
-        int nSv=arma::find(s>tol*s[0]).eval().size();
-        if (nSv>1) s.head_rows(nSv).as_row().print("-->singular values");
-        auto givens=GivensRotForRot_left(arma::conj(V.head_cols(nSv)).eval());
-        //for(auto& g:givens) g.b+=p0;
-        GivensDaggerInPlace(givens);
-        auto Kcol=K.cols(pos0).eval();
-        applyGivens(Kcol,givens);
-        K.cols(pos0)=Kcol;
-        auto Krow=K.rows(pos0).eval();
-        applyGivens(GivensDagger(givens),Krow);
-        K.rows(pos0)=Krow;
-        // no need to update cc
-        nActive += nSv;
+        if (i<nActive || j<nActive) throw std::runtime_error("SlaterSwap for active orbitals");
+        if (i==j) return;
+        K.swap_cols(i,j);
+        K.swap_rows(i,j);
+
+        cc.swap_cols(i,j);
+        cc.swap_rows(i,j);
+
+        itensor::AutoMPO ampo(sites);
+        ampo += "Cdag",i+1,"C",j+1;
+        ampo += "Cdag",j+1, "C",i+1;
+        auto op = itensor::toMPO(ampo);
+        psi = applyMPO(op,psi);
+        psi.replaceSiteInds(sites.inds());
     }
 };
+
+// struct EigenPair
+// {
+//     int nEigen;
+//     std::vector<double> eval;
+//     std::vector<double> evec;
+//     EigenPair(int dim,int nEigen):nEigen(nEigen),eval(dim),evec(dim*nEigen){}
+// };
+
+// EigenPair DiagonalizeTridiagonal(double *an,double *bn,int size)
+// {
+//     EigenPair eigen(size,1);
+//     int M;
+//     std::vector<int> ifail(size);
+//     int info=LAPACKE_dstevx(LAPACK_COL_MAJOR,'V','I', size, an, bn,
+//                               0.0, 0.0,1,eigen.nEigen,2e-11,&M,eigen.eval.data(),eigen.evec.data(),size,ifail.data());
+//     if (info!=0) throw
+//             std::runtime_error("LAPACKE_dstevx inside DiagonalizeTridiagonal, info!=0");
+//     return eigen;
+// }
 
 #endif // IRLM_GS_H
