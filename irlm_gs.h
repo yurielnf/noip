@@ -126,10 +126,19 @@ struct Irlm_gs {
         auto Kcol=K.cols(pos0).eval();
         applyGivens(Kcol,givens);
         K.cols(pos0)=Kcol;
-        auto Krow=K.rows(pos0).eval();
-        applyGivens(GivensDagger(givens),Krow);
-        K.rows(pos0)=Krow;
-        std::cout<<" givens to K "<<t0.sincemark()<<std::endl; t0.mark();
+        std::cout<<" givens to K 1"<<t0.sincemark()<<std::endl; t0.mark();
+
+        {
+            auto Kp=K.t().eval();
+            auto Kcol=Kp.cols(pos0).eval();
+            applyGivens(Kcol,givens);
+            Kp.cols(pos0)=Kcol;
+            K=Kp.t();
+            // auto Krow=K.rows(pos0).eval();
+            // applyGivens(GivensDagger(givens),Krow);
+            // K.rows(pos0)=Krow;
+        }
+        std::cout<<" givens to K 2"<<t0.sincemark()<<std::endl; t0.mark();
         // no need to update cc
         for(auto i=0; i<nSv; i++) {
             SlaterSwap(nActive,pos0.at(i));
