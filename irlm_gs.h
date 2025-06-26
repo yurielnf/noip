@@ -132,7 +132,7 @@ struct Irlm_gs {
         std::cout<<" givens to K "<<t0.sincemark()<<std::endl; t0.mark();
         // no need to update cc
         for(auto i=0; i<nSv; i++) {
-            SlaterSwap2(nActive,pos0.at(i));
+            SlaterSwap(nActive,pos0.at(i));
             nActive++;
         }
         std::cout<<" Slater swap "<<t0.sincemark()<<std::endl; t0.mark();
@@ -224,24 +224,6 @@ private:
 
     /// Swap to sites inside the Slater part
     void SlaterSwap(int i,int j)
-    {
-        if (i<nActive || j<nActive) throw std::runtime_error("SlaterSwap for active orbitals");
-        if (i==j) return;
-        K.swap_cols(i,j);
-        K.swap_rows(i,j);
-
-        cc.swap_cols(i,j);
-        cc.swap_rows(i,j);
-
-        itensor::AutoMPO ampo(sites);
-        ampo += "Cdag",i+1,"C",j+1;
-        ampo += "Cdag",j+1, "C",i+1;
-        auto op = itensor::toMPO(ampo);
-        psi = applyMPO(op,psi);
-        psi.replaceSiteInds(sites.inds());
-    }
-
-    void SlaterSwap2(int i,int j)
     {
         if (i==j) return;
         if (i<nActive || j<nActive) throw std::runtime_error("SlaterSwap for active orbitals");
