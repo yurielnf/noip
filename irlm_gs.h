@@ -7,6 +7,9 @@
 #include <armadillo>
 #include <itensor/all.h>
 
+
+std::pair<arma::vec,arma::mat> FullDiagonalizeTridiagonal(arma::vec an, arma::vec bn);
+
 struct IrlmData {
     int L=20;
     double t=0.5;
@@ -16,9 +19,9 @@ struct IrlmData {
     bool connected=true;
 
     /// Kinetic energy matrix
-    arma::mat kin_mat() const
+    arma::sp_mat kin_mat() const
     {
-        arma::mat K(L,L, arma::fill::zeros);
+        arma::sp_mat K(L,L);
         for(auto i=1+!connected; i<L-1; i++)
             K(i,i+1)=K(i+1,i)=t;
         K(0,1)=K(1,0)=V;
@@ -44,9 +47,10 @@ struct IrlmData {
     {
         auto K=kin_mat();
         arma::mat Kbath=arma::mat {K.submat(2,2,L-1,L-1).eval()};
-        arma::mat evec;
-        arma::vec ek;
-        arma::eig_sym(ek,evec,Kbath);
+        // arma::mat evec;
+        // arma::vec ek;
+        // arma::eig_sym(ek,evec,Kbath);
+        auto [ek,evec]=FullDiagonalizeTridiagonal(Kbath.diag().eval(),Kbath.diag(1).eval());
         arma::vec vk=(K.submat(1,2,1,L-1)*evec).as_col();
 
         arma::mat Kstar(L,L,arma::fill::zeros);
@@ -64,6 +68,7 @@ struct DmrgParams {
     int nIter_diag=4;
     double noise=1e-8;
 };
+
 
 struct Irlm_gs {
     IrlmData irlm;
@@ -129,11 +134,11 @@ struct Irlm_gs {
         std::cout<<" givens to K 1"<<t0.sincemark()<<std::endl; t0.mark();
 
         {
-            auto Kp=K.t().eval();
-            auto Kcol=Kp.cols(pos0).eval();
+            arma::inplace_trans(K);
+            auto Kcol=K.cols(pos0).eval();
             applyGivens(Kcol,givens);
-            Kp.cols(pos0)=Kcol;
-            K=Kp.t();
+            K.cols(pos0)=Kcol;
+            arma::inplace_trans(K);
             // auto Krow=K.rows(pos0).eval();
             // applyGivens(GivensDagger(givens),Krow);
             // K.rows(pos0)=Krow;
@@ -220,7 +225,7 @@ struct Irlm_gs {
 
     itensor::MPO fullHamiltonian(bool real_space=true) const
     {
-        auto kin= real_space ? irlm.kin_mat() : K;
+        auto kin= real_space ? arma::mat {irlm.kin_mat()} : K;
         auto h=hImp;
         for(auto i=0; i<irlm.L; i++)
             for(auto j=0; j<irlm.L; j++)
@@ -258,24 +263,40 @@ private:
     }
 };
 
-// struct EigenPair
-// {
-//     int nEigen;
-//     std::vector<double> eval;
-//     std::vector<double> evec;
-//     EigenPair(int dim,int nEigen):nEigen(nEigen),eval(dim),evec(dim*nEigen){}
-// };
+#include<mkl_lapacke.h>
 
-// EigenPair DiagonalizeTridiagonal(double *an,double *bn,int size)
-// {
-//     EigenPair eigen(size,1);
-//     int M;
-//     std::vector<int> ifail(size);
-//     int info=LAPACKE_dstevx(LAPACK_COL_MAJOR,'V','I', size, an, bn,
-//                               0.0, 0.0,1,eigen.nEigen,2e-11,&M,eigen.eval.data(),eigen.evec.data(),size,ifail.data());
-//     if (info!=0) throw
-//             std::runtime_error("LAPACKE_dstevx inside DiagonalizeTridiagonal, info!=0");
-//     return eigen;
-// }
+struct EigenPair
+{
+    int nEigen;
+    std::vector<double> eval;
+    std::vector<double> evec;
+    EigenPair(int dim,int nEigen):nEigen(nEigen),eval(dim),evec(dim*nEigen){}
+};
+
+EigenPair DiagonalizeTridiagonal(double *an,double *bn,int size)
+{
+    EigenPair eigen(size,1);
+    long long M;
+    std::vector<long long> ifail(size);
+    int info=LAPACKE_dstevx(LAPACK_COL_MAJOR,'V','I', size, an, bn,
+                              0.0, 0.0,1,eigen.nEigen,2e-11,&M,eigen.eval.data(),eigen.evec.data(),size,ifail.data());
+    if (info!=0) throw
+            std::runtime_error("LAPACKE_dstevx inside DiagonalizeTridiagonal, info!=0");
+    return eigen;
+}
+
+inline std::pair<arma::vec,arma::mat> FullDiagonalizeTridiagonal(arma::vec an, arma::vec bn)
+{
+    long long size=an.size();
+    long long M;
+    arma::vec eval(size);
+    arma::mat evec(size,size);
+    std::vector<long long> ifail(size);
+    int info=LAPACKE_dstevr(LAPACK_COL_MAJOR,'V','A', size, an.memptr(), bn.memptr(),
+                              0.0, 0.0,1,1,2e-11,&M,eval.memptr(),evec.memptr(),size,ifail.data());
+    if (info!=0) throw
+            std::runtime_error("LAPACKE_dstevx inside DiagonalizeTridiagonal, info!=0");
+    return std::make_pair(eval,evec);
+}
 
 #endif // IRLM_GS_H
