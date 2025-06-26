@@ -90,13 +90,19 @@ int main()
 
     cout<<"iteration nActive energy time\n"<<setprecision(12);
     for(auto i=0;i<30;i++){
-        model0.iterate();
+        model0.extract_f(0.0);
+        model0.extract_f(1.0);
+        cout<<"extract f: "<<t0.sincemark()<<"  "; t0.mark();
+        model0.doDmrg();
+        cout<<"dmrg: "<<t0.sincemark()<<"  "; t0.mark();
+        model0.rotateToNaturalOrbitals();
+        cout<<"nat orb: "<<t0.sincemark()<<"  "; t0.mark();
         cout<<i+1<<" "<<model0.nActive<<" "<<model0.energy<<" "<<t0.sincemark().wall<<endl;
         t0.mark();
     }
 
     // cout<<"\n\nNormal dmrg\n";
-    //auto sol_gs=computeGS(model0.sites,model0.fullHamiltonian(true));
+    // auto sol_gs=computeGS(model0.sites,model0.fullHamiltonian(true));
 
     return 0;
 }

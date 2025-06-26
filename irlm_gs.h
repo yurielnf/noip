@@ -117,20 +117,25 @@ struct Irlm_gs {
         svd(U,s,V, k12);
         int nSv=arma::find(s>tol*s[0]).eval().size();
         // if (nSv>1) s.head_rows(nSv).as_row().print("-->singular values");
-        auto givens=GivensRotForRot_left(arma::conj(V.head_cols(nSv)).eval());
+        itensor::cpu_time t0;
+        auto givens=GivensRotForRot_left(V.head_cols(nSv).eval());
+        std::cout<<" generate givens "<<t0.sincemark()<<std::endl; t0.mark();
         //for(auto& g:givens) g.b+=p0;
         GivensDaggerInPlace(givens);
+        std::cout<<" dagger in place "<<t0.sincemark()<<std::endl; t0.mark();
         auto Kcol=K.cols(pos0).eval();
         applyGivens(Kcol,givens);
         K.cols(pos0)=Kcol;
         auto Krow=K.rows(pos0).eval();
         applyGivens(GivensDagger(givens),Krow);
         K.rows(pos0)=Krow;
+        std::cout<<" givens to K "<<t0.sincemark()<<std::endl; t0.mark();
         // no need to update cc
         for(auto i=0; i<nSv; i++) {
-            SlaterSwap(nActive,pos0.at(i));
+            SlaterSwap2(nActive,pos0.at(i));
             nActive++;
         }
+        std::cout<<" Slater swap "<<t0.sincemark()<<std::endl; t0.mark();
     }
 
     void doDmrg(DmrgParams args={})
@@ -234,6 +239,31 @@ private:
         auto op = itensor::toMPO(ampo);
         psi = applyMPO(op,psi);
         psi.replaceSiteInds(sites.inds());
+    }
+
+    void SlaterSwap2(int i,int j)
+    {
+        if (i==j) return;
+        if (i<nActive || j<nActive) throw std::runtime_error("SlaterSwap for active orbitals");
+        if (std::abs(cc(i,i)-cc(j,j))<0.5) {
+            std::cout<<" swap "<<i<<" "<<j<<"\n";
+            std::cout.flush();
+            throw std::runtime_error("SlaterSwap for equal occupations");
+        }
+        K.swap_cols(i,j);
+        K.swap_rows(i,j);
+
+        auto flip=[&](int p) {
+            auto G = cc(p,p)>0.5 ? sites.op("A",p+1) : sites.op("Adag",p+1) ;
+            auto newA = G*psi(p+1);
+            newA.noPrime();
+            psi.set(p+1,newA);
+        };
+        flip(i);
+        flip(j);
+
+        cc.swap_cols(i,j);
+        cc.swap_rows(i,j);
     }
 };
 
