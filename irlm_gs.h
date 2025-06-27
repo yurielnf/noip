@@ -121,16 +121,12 @@ struct Irlm_gs {
         arma::mat U, V;
         svd(U,s,V, k12);
         int nSv=arma::find(s>tol*s[0]).eval().size();
-        // if (nSv>1) s.head_rows(nSv).as_row().print("-->singular values");
-        itensor::cpu_time t0;
         auto givens=GivensRotForRot_left(V.head_cols(nSv).eval());
-        std::cout<<" generate givens "<<t0.sincemark()<<std::endl; t0.mark();
-        //for(auto& g:givens) g.b+=p0;
         GivensDaggerInPlace(givens);
-        std::cout<<" dagger in place "<<t0.sincemark()<<std::endl; t0.mark();
         auto Kcol=K.cols(pos0).eval();
         applyGivens(Kcol,givens);
         K.cols(pos0)=Kcol;
+        itensor::cpu_time t0;
         std::cout<<" givens to K 1"<<t0.sincemark()<<std::endl; t0.mark();
 
         {
@@ -149,7 +145,6 @@ struct Irlm_gs {
             SlaterSwap(nActive,pos0.at(i));
             nActive++;
         }
-        std::cout<<" Slater swap "<<t0.sincemark()<<std::endl; t0.mark();
     }
 
     void doDmrg(DmrgParams args={})
@@ -167,13 +162,7 @@ struct Irlm_gs {
         sweeps.niter() = args.nIter_diag;
         sweeps.noise() = args.noise;
         energy=itensor::dmrg(psi,mpo,sweeps, {"MaxSite",nActive,"Quiet", true, "Silent", true});
-        //psi.normalize();
-        // energy=itensor::inner(psi,mpo,psi);
         energy += SlaterEnergy();
-        //std::cout<<" "<<energy<<" ";
-
-        //energy=itensor::inner(psi,fullHamiltonian(false),psi);
-
         auto ccz=correlationMatrix(psi, sites,"Cdag","C",itensor::range1(nActive));
         for(auto i=0u; i<ccz.size(); i++)
             for(auto j=0u; j<ccz[i].size(); j++)
@@ -187,7 +176,6 @@ struct Irlm_gs {
         for(auto& g:givens) g.b+=2;
         auto gates=Fermionic::NOGates(sites,givens);
         gateTEvol(gates,1,1,psi,{"Cutoff",tol,"Quiet",true, "Normalize",false,"ShowPercent",false});
-        // psi.orthogonalize({"Cutoff",tol});
         auto rot1=matrot_from_Givens(givens,nActive);
         cc.cols(0,nActive-1)=cc.cols(0,nActive-1).eval()*rot1.t();
         cc.rows(0,nActive-1)=rot1*cc.rows(0,nActive-1).eval();
@@ -211,7 +199,6 @@ struct Irlm_gs {
             energy += ek[k];
             cc(k,k)=1;
         }
-        // std::cout << " Slater energy: " << energy << std::endl;
         psi=itensor::MPS(state);
     }
 
@@ -265,35 +252,14 @@ private:
 
 #include<mkl_lapacke.h>
 
-struct EigenPair
-{
-    int nEigen;
-    std::vector<double> eval;
-    std::vector<double> evec;
-    EigenPair(int dim,int nEigen):nEigen(nEigen),eval(dim),evec(dim*nEigen){}
-};
-
-EigenPair DiagonalizeTridiagonal(double *an,double *bn,int size)
-{
-    EigenPair eigen(size,1);
-    long long M;
-    std::vector<long long> ifail(size);
-    int info=LAPACKE_dstevx(LAPACK_COL_MAJOR,'V','I', size, an, bn,
-                              0.0, 0.0,1,eigen.nEigen,2e-11,&M,eigen.eval.data(),eigen.evec.data(),size,ifail.data());
-    if (info!=0) throw
-            std::runtime_error("LAPACKE_dstevx inside DiagonalizeTridiagonal, info!=0");
-    return eigen;
-}
-
 inline std::pair<arma::vec,arma::mat> FullDiagonalizeTridiagonal(arma::vec an, arma::vec bn)
 {
-    long long size=an.size();
-    long long M;
-    arma::vec eval(size);
-    arma::mat evec(size,size);
-    std::vector<long long> ifail(size);
-    int info=LAPACKE_dstevr(LAPACK_COL_MAJOR,'V','A', size, an.memptr(), bn.memptr(),
-                              0.0, 0.0,1,1,2e-11,&M,eval.memptr(),evec.memptr(),size,ifail.data());
+    lapack_int n=an.size(), M;
+    arma::vec eval(n);
+    arma::mat evec(n,n);
+    std::vector<lapack_int> ifail(n);
+    int info=LAPACKE_dstevr(LAPACK_COL_MAJOR,'V','A', n, an.memptr(), bn.memptr(),
+                              0.0, 0.0,1,1,2e-11,&M,eval.memptr(),evec.memptr(),n,ifail.data());
     if (info!=0) throw
             std::runtime_error("LAPACKE_dstevx inside DiagonalizeTridiagonal, info!=0");
     return std::make_pair(eval,evec);
