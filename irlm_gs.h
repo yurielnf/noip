@@ -82,6 +82,8 @@ struct Irlm_gs {
 
     std::vector<GivensRot<>> givens_all;
     arma::mat rot_all;
+    arma::sp_mat Kstar;
+    // arma::mat KActive;
 
 
     explicit Irlm_gs(const IrlmData& irlm_, double tol_=1e-10)
@@ -91,6 +93,7 @@ struct Irlm_gs {
         , tol(tol_)
         , K(irlm_.star_kin())
         , rot_all(irlm_.L,irlm.L,arma::fill::eye)
+        , Kstar(irlm_.star_kin())
     {
         prepareSlaterGs(sites, arma::vec {K.diag()}, irlm.L/2);
 
@@ -121,23 +124,23 @@ struct Irlm_gs {
         auto k12 = K.head_rows(nActive).eval().cols(pos0).eval();
 
         { // here is my test
-            arma::mat k12aa= rot_all.head_cols(nActive).t()*irlm.star_kin()*rot_all.cols(pos0);
-            if (arma::norm(k12-k12aa)>1e-8) {
-                k12.print("K12");
-                k12aa.print("k12aa");
-                std::terminate();
-            }
+            // arma::mat k12aa= rot_all.head_cols(nActive).t()*irlm.star_kin()*rot_all.cols(pos0);
+            // if (arma::norm(k12-k12aa)>1e-8) {
+            //     k12.print("K12");
+            //     k12aa.print("k12aa");
+            //     std::terminate();
+            // }
 
-            arma::mat k12a=arma::mat{irlm.star_kin()};
-            applyGivens(k12a,GivensDagger(givens_all));
-            applyGivens(givens_all,k12a);
-            k12a=k12a.head_rows(nActive).eval().cols(pos0);
-            if (arma::norm(k12-k12a)>1e-8) {
-                k12.print("K12");
-                k12a.print("k12a");
-                std::terminate();
-            }
-            auto k12b=rotateGivens_get_headRows(irlm.star_kin(),GivensDagger(givens_all),nActive).cols(pos0).eval();
+            // arma::mat k12a=arma::mat{irlm.star_kin()};
+            // applyGivens(k12a,GivensDagger(givens_all));
+            // applyGivens(givens_all,k12a);
+            // k12a=k12a.head_rows(nActive).eval().cols(pos0);
+            // if (arma::norm(k12-k12a)>1e-8) {
+            //     k12.print("K12");
+            //     k12a.print("k12a");
+            //     std::terminate();
+            // }
+            auto k12b=rotateGivens_get_headRows(Kstar,GivensDagger(givens_all),nActive).cols(pos0).eval();
             if (arma::norm(k12-k12b)>1e-8) {
                 k12.print("K12");
                 k12b.print("k12b");
@@ -183,19 +186,35 @@ struct Irlm_gs {
             rot_all.cols(pos0) = rot_all.cols(pos0).eval() * rot1;
         }
 
+        int nA=nActive;
         for(auto i=0; i<nSv; i++) {
             SlaterSwap(nActive,pos0.at(i));
             nActive++;
-        }        
+        }
+
+        { // here is my test
+            // KActive.resize(nA+nSv,nA+nSv);
+            // KActive.submat(0,nA,nA-1,nA+nSv-1)=U*arma::diagmat(s).eval().head_cols(nSv);
+            // KActive.submat(nA,0,nA+nSv-1,nA-1)=KActive.submat(0,nA,nA-1,nA+nSv-1).t();
+            // for(auto i=0;i<nSv; i++)
+            //     for(auto j=0;j<nSv; j++)
+            //         KActive(nA+i,nA+j)=rotateGivens_get_at(Kstar,GivensDagger(givens_all),nA+i,nA+j);
+            // if (arma::norm(KActive-K.submat(0,0,nActive-1,nActive-1))>1e-8) {
+            //     KActive.print("Kactive");
+            //     K.submat(0,0,nActive-1,nActive-1).print("K");
+            //     std::terminate();
+            // }
+        }
     }
 
     void doDmrg(DmrgParams args={})
     {
+        auto KActive=rotateGivens_get_headRows(Kstar,GivensDagger(givens_all),nActive).head_cols(nActive).eval();
         auto h=hImp;
         for(auto i=0; i<nActive; i++)
             for(auto j=0; j<nActive; j++)
-            if (std::abs(K(i,j))>tol)
-                h += K(i,j),"Cdag",i+1,"C",j+1;
+            if (std::abs(KActive(i,j))>tol)
+                h += KActive(i,j),"Cdag",i+1,"C",j+1;
         auto mpo=itensor::toMPO(h);
 
         auto sweeps = itensor::Sweeps(1);
@@ -204,7 +223,7 @@ struct Irlm_gs {
         sweeps.niter() = args.nIter_diag;
         sweeps.noise() = args.noise;
         energy=itensor::dmrg(psi,mpo,sweeps, {"MaxSite",nActive,"Quiet", true, "Silent", true});
-        energy += SlaterEnergy();
+        // energy += SlaterEnergy();
         auto ccz=correlationMatrix(psi, sites,"Cdag","C",itensor::range1(nActive));
         for(auto i=0u; i<ccz.size(); i++)
             for(auto j=0u; j<ccz[i].size(); j++)
@@ -219,17 +238,20 @@ struct Irlm_gs {
         auto gates=Fermionic::NOGates(sites,givens);
         gateTEvol(gates,1,1,psi,{"Cutoff",tol,"Quiet",true, "Normalize",false,"ShowPercent",false});
         auto rot1=matrot_from_Givens(givens,nActive);
-        cc.cols(0,nActive-1)=cc.cols(0,nActive-1).eval()*rot1.t();
-        cc.rows(0,nActive-1)=rot1*cc.rows(0,nActive-1).eval();
+        cc.submat(0,0,nActive-1,nActive-1)=rot1*cc.submat(0,0,nActive-1,nActive-1).eval()*rot1.t();
         K.cols(0,nActive-1)=K.cols(0,nActive-1).eval()*rot1.st();
         K.rows(0,nActive-1)=rot1.st().t()*K.rows(0,nActive-1).eval();
-        auto nib=arma::real(arma::vec(cc.diag()).rows(2,irlm.L-1)).eval();
-        nActive=arma::find(nib>tol && nib<1-tol).eval().size()+2;
 
         { // here is my test
             for(const auto& g: givens) givens_all.push_back(g); // .conj() missing
             rot_all.head_cols(rot1.n_cols)=rot_all.head_cols(rot1.n_cols).eval()*rot1.st();
+            // KActive=rot1.st().t()*KActive*rot1.st();
         }
+
+        auto nib=arma::real(arma::vec(cc.diag()).rows(2,irlm.L-1)).eval();
+        nActive=arma::find(nib>tol && nib<1-tol).eval().size()+2;
+
+        // KActive.resize(nActive,nActive);
     }
 
     void prepareSlaterGs(itensor::Fermion const& sites, arma::vec ek, int nPart)
@@ -253,7 +275,7 @@ struct Irlm_gs {
     {
         double energy=0;
         for(auto i=nActive; i<irlm.L; i++)
-            energy += cc(i,i)*K(i,i);
+            energy += cc(i,i)*rotateGivens_get_diag_at(Kstar,GivensDagger(givens_all),i);
         return energy;
     }
 
