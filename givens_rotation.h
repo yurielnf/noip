@@ -44,7 +44,9 @@ struct GivensRot {
     using matrix22=typename arma::Mat<T>::template fixed<2,2>;
 
     size_t b;     ///< bond b --- b+1
-    T c=1, s=0;  ///< cos, sin, radius
+    T c=1, s=0;   ///< cos, sin
+    int b2=-1;    ///< -1 means b+1
+    bool is_swap=false; ///< when true it means a swap(b,b2)
 
     //GivensRot(size_t b_) : b(b_) {}
 
@@ -65,27 +67,40 @@ struct GivensRot {
     }
 
     /// assuming that |z|=1 ??
-    GivensRot<cmpx> operator*(cmpx z) const { GivensRot<cmpx> g{.b=b}; g.c=c*z; g.s=s*z; return g;}
+    //GivensRot<cmpx> operator*(cmpx z) const { GivensRot<cmpx> g{.b=b}; g.c=c*z; g.s=s*z; return g;}
 
     /// return transpose conjugate
     GivensRot<T> dagger() const;
-
-    /// element-wise complex conjugate
-    GivensRot<T> conj() const;
 };
 
 template<class T>
 void applyGivens(GivensRot<T> const& g, arma::Mat<T>& A)
 {
-    auto Ar=A.rows(g.b,g.b+1).eval();
-    A.rows(g.b,g.b+1)=g.matrix()*Ar;
+    if (g.is_swap && g.b2!=-1) return A.swap_rows(g.b,g.b2);
+    if (g.b2==-1) {
+        auto Ar=A.rows(g.b,g.b+1).eval();
+        A.rows(g.b,g.b+1)=g.matrix()*Ar;
+    }
+    else {
+        arma::uvec pos={g.b,g.b2};
+        auto Ar=A.rows(pos).eval();
+        A.rows(pos)=g.matrix()*Ar;
+    }
 }
 
 template<class T>
 void applyGivens(arma::Mat<T>& A, GivensRot<T> const& g)
 {
-    auto Ac=A.cols(g.b,g.b+1).eval();
-    A.cols(g.b,g.b+1) = Ac * g.matrix();
+    if (g.is_swap && g.b2!=-1) return A.swap_cols(g.b,g.b2);
+    if (g.b2==-1) {
+        auto Ac=A.cols(g.b,g.b+1).eval();
+        A.cols(g.b,g.b+1) = Ac * g.matrix();
+    }
+    else {
+        arma::uvec pos={g.b,g.b2};
+        auto Ac=A.cols(pos).eval();
+        A.cols(pos) = Ac * g.matrix();
+    }
 }
 
 
@@ -138,10 +153,7 @@ template<>
 GivensRot<double>::matrix22 GivensRot<double>::matrix() const { return {{c, -s},{s, c}}; }
 
 template<>
-GivensRot<double> GivensRot<double>::dagger() const { return {.b=b, .c=c, .s=-s}; }
-
-template<>
-GivensRot<double> GivensRot<double>::conj() const { return *this; }
+GivensRot<double> GivensRot<double>::dagger() const { return {.b=b, .c=c, .s=-s, .b2=b2, .is_swap=is_swap}; }
 
 template<>
 GivensRot<cmpx> GivensRot<cmpx>::createFromPair(size_t b, cmpx p, cmpx q, bool go_right, cmpx *r)
@@ -212,10 +224,7 @@ template<>
 GivensRot<cmpx>::matrix22 GivensRot<cmpx>::matrix() const { return {{std::conj(c), -std::conj(s)},{s, c}}; }
 
 template<>
-GivensRot<cmpx> GivensRot<cmpx>::dagger() const { return {.b=b, .c=std::conj(c), .s=-s}; }
-
-template<>
-GivensRot<cmpx> GivensRot<cmpx>::conj() const { return {.b=b, .c=std::conj(c), .s=std::conj(s)}; }
+GivensRot<cmpx> GivensRot<cmpx>::dagger() const { return {.b=b, .c=std::conj(c), .s=-s, .b2=b2, .is_swap=is_swap}; }
 
 
 //------------------------- set of Givens rotations -----------------------------------------
@@ -232,6 +241,37 @@ void applyGivens(arma::Mat<T>& A, std::vector<GivensRot<T>> const& gs)
 {
     for(auto it=gs.crbegin(); it!=gs.crend(); ++it)
         applyGivens(A,*it);
+}
+
+template<class T>
+arma::Mat<T> rotateGivens_get_headRows(arma::SpMat<T> const& A, std::vector<GivensRot<T>> const& gs, int n_rows)
+{
+    arma::Mat<T> B(n_rows,A.n_cols, arma::fill::eye);
+    applyGivens(B,GivensDagger(gs));
+    B*=A;
+    applyGivens(B,gs);
+    return B;
+}
+
+template<class T>
+T rotateGivens_get_diag_at(arma::SpMat<T> const& A, std::vector<GivensRot<T>> const& gs, int i)
+{
+    arma::Mat<T> B(A.n_rows,1, arma::fill::zeros);
+    B(i)=1;
+    applyGivens(gs,B);
+    return arma::cdot(B.as_col(),A*B.as_col());
+}
+
+template<class T>
+T rotateGivens_get_at(arma::SpMat<T> const& A, std::vector<GivensRot<T>> const& gs, int i, int j)
+{
+    auto get_Bi=[&](int i) {
+        arma::Mat<T> Bi(A.n_rows,1, arma::fill::zeros);
+        Bi(i)=1;
+        applyGivens(gs,Bi);
+        return Bi.as_col().eval();
+    };
+    return arma::cdot(get_Bi(i), A * get_Bi(j));
 }
 
 
