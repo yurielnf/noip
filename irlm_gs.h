@@ -43,17 +43,14 @@ struct IrlmData {
     }
 
     /// Kinetic energy coeff in star geometry (Hbath is diagonal)
-    arma::mat star_kin() const
+    arma::sp_mat star_kin() const
     {
         auto K=kin_mat();
-        arma::mat Kbath=arma::mat {K.submat(2,2,L-1,L-1).eval()};
-        // arma::mat evec;
-        // arma::vec ek;
-        // arma::eig_sym(ek,evec,Kbath);
-        auto [ek,evec]=FullDiagonalizeTridiagonal(Kbath.diag().eval(),Kbath.diag(1).eval());
+        arma::sp_mat Kbath=K.submat(2,2,L-1,L-1).eval();
+        auto [ek,evec]=FullDiagonalizeTridiagonal(arma::vec{Kbath.diag()},arma::vec{Kbath.diag(1)});
         arma::vec vk=(K.submat(1,2,1,L-1)*evec).as_col();
 
-        arma::mat Kstar(L,L,arma::fill::zeros);
+        arma::sp_mat Kstar(L,L);
         Kstar.submat(0,0,1,1)=K.submat(0,0,1,1);
         for(auto i=0u;i<ek.size();i++) {
             Kstar(i+2,i+2)=ek[i];
@@ -80,8 +77,11 @@ struct Irlm_gs {
     arma::mat K;
     itensor::MPS psi;
     double energy=-1000;
-    arma::mat cc;
+    arma::sp_mat cc;
     int nActive=2;
+
+    std::vector<GivensRot<>> givens_all;
+    arma::mat rot_all;
 
 
     explicit Irlm_gs(const IrlmData& irlm_, double tol_=1e-10)
@@ -90,6 +90,7 @@ struct Irlm_gs {
         , hImp (sites)
         , tol(tol_)
         , K(irlm_.star_kin())
+        , rot_all(irlm_.L,irlm.L,arma::fill::eye)
     {
         prepareSlaterGs(sites, arma::vec {K.diag()}, irlm.L/2);
 
@@ -112,14 +113,41 @@ struct Irlm_gs {
     /// extract f orbital of the sites with ni=0 or 1
     void extract_f(double nRef)
     {
-        arma::vec ni=cc.diag();
+        if (nActive==irlm.L) return;
+        arma::vec ni=arma::vec {cc.diag()};
         arma::vec nSlater=arma::abs(ni.rows(nActive,irlm.L-1)-nRef).eval();
         arma::uvec pos0=arma::find(nSlater<0.5).eval()+nActive ;
         if (pos0.empty()) { std::cout<<"warning: no slater?\n"; return; }
         auto k12 = K.head_rows(nActive).eval().cols(pos0).eval();
+
+        { // here is my test
+            arma::mat k12aa= rot_all.head_cols(nActive).t()*irlm.star_kin()*rot_all.cols(pos0);
+            if (arma::norm(k12-k12aa)>1e-8) {
+                k12.print("K12");
+                k12aa.print("k12aa");
+                std::terminate();
+            }
+
+            arma::mat k12a=arma::mat{irlm.star_kin()};
+            applyGivens(k12a,GivensDagger(givens_all));
+            applyGivens(givens_all,k12a);
+            k12a=k12a.head_rows(nActive).eval().cols(pos0);
+            if (arma::norm(k12-k12a)>1e-8) {
+                k12.print("K12");
+                k12a.print("k12a");
+                std::terminate();
+            }
+            auto k12b=rotateGivens_get_headRows(irlm.star_kin(),GivensDagger(givens_all),nActive).cols(pos0).eval();
+            if (arma::norm(k12-k12b)>1e-8) {
+                k12.print("K12");
+                k12b.print("k12b");
+                std::terminate();
+            }
+        }
+
         arma::vec s;
         arma::mat U, V;
-        svd(U,s,V, k12);
+        svd_econ(U,s,V, k12);
         int nSv=arma::find(s>tol*s[0]).eval().size();
         auto givens=GivensRotForRot_left(V.head_cols(nSv).eval());
         GivensDaggerInPlace(givens);
@@ -140,11 +168,25 @@ struct Irlm_gs {
             // K.rows(pos0)=Krow;
         }
         std::cout<<" givens to K 2"<<t0.sincemark()<<std::endl; t0.mark();
+
         // no need to update cc
+
+        { // here is my test            
+            for(auto const& g:GivensDagger(givens)) {
+                auto gc=g;
+                gc.b=pos0.at(g.b);
+                gc.b2=pos0.at(g.b+1);
+                givens_all.push_back(gc);
+            }
+
+            auto rot1=matrot_from_Givens(givens,pos0.size());
+            rot_all.cols(pos0) = rot_all.cols(pos0).eval() * rot1;
+        }
+
         for(auto i=0; i<nSv; i++) {
             SlaterSwap(nActive,pos0.at(i));
             nActive++;
-        }
+        }        
     }
 
     void doDmrg(DmrgParams args={})
@@ -171,7 +213,7 @@ struct Irlm_gs {
 
     void rotateToNaturalOrbitals()
     {
-        auto cc1=cc.submat(2,2,nActive-1, nActive-1).eval();
+        auto cc1=arma::mat {cc.submat(2,2,nActive-1, nActive-1)};
         auto givens=GivensRotForCC_right(cc1);
         for(auto& g:givens) g.b+=2;
         auto gates=Fermionic::NOGates(sites,givens);
@@ -181,13 +223,18 @@ struct Irlm_gs {
         cc.rows(0,nActive-1)=rot1*cc.rows(0,nActive-1).eval();
         K.cols(0,nActive-1)=K.cols(0,nActive-1).eval()*rot1.st();
         K.rows(0,nActive-1)=rot1.st().t()*K.rows(0,nActive-1).eval();
-        auto nib=arma::real(cc.diag()).eval().rows(2,irlm.L-1).eval();
+        auto nib=arma::real(arma::vec(cc.diag()).rows(2,irlm.L-1)).eval();
         nActive=arma::find(nib>tol && nib<1-tol).eval().size()+2;
+
+        { // here is my test
+            for(const auto& g: givens) givens_all.push_back(g); // .conj() missing
+            rot_all.head_cols(rot1.n_cols)=rot_all.head_cols(rot1.n_cols).eval()*rot1.st();
+        }
     }
 
     void prepareSlaterGs(itensor::Fermion const& sites, arma::vec ek, int nPart)
     {
-        cc=arma::mat(irlm.L, irlm.L, arma::fill::zeros);
+        cc=arma::sp_mat(irlm.L, irlm.L);
         ek[0]=-10; // force ocupation |10>
         ek[1]=10;
         auto state = itensor::InitState(sites,"0");
@@ -202,7 +249,7 @@ struct Irlm_gs {
         psi=itensor::MPS(state);
     }
 
-    double SlaterEnergy()
+    double SlaterEnergy() const
     {
         double energy=0;
         for(auto i=nActive; i<irlm.L; i++)
@@ -223,7 +270,7 @@ struct Irlm_gs {
 
 private:
 
-    /// Swap to sites inside the Slater part
+    /// Swap two sites inside the Slater part
     void SlaterSwap(int i,int j)
     {
         if (i==j) return;
@@ -247,6 +294,11 @@ private:
 
         cc.swap_cols(i,j);
         cc.swap_rows(i,j);
+
+        { // here is my test
+            givens_all.push_back({.b=size_t(i), .b2=j, .is_swap=true});
+            rot_all.swap_cols(i,j);
+        }
     }
 };
 
