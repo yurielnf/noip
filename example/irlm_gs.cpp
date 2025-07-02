@@ -51,16 +51,18 @@ int main()
     cout<<"initialization: "<<t0.sincemark().wall<<endl;
     t0.mark();
 
-    cout<<"iteration nActive energy time\n"<<setprecision(12);
+    cout<<"extract_f dmrg nat_orb iteration nActive energy time\n"<<setprecision(12);
     for(auto i=0;i<30;i++){
         model0.extract_f(0.0);
         model0.extract_f(1.0);
-        cout<<"extract f: "<<t0.sincemark()<<"  "; t0.mark();
+        cout<<t0.sincemark().wall<<" "; t0.mark();
         model0.doDmrg();
-        cout<<"dmrg: "<<t0.sincemark()<<"  "; t0.mark();
+        cout<<t0.sincemark().wall<<"  "; t0.mark();
+        double energy=model0.energy;//+model0.SlaterEnergy();
+        // cout<<t0.sincemark().wall<<"  "; t0.mark();
         model0.rotateToNaturalOrbitals();
-        cout<<"nat orb: "<<t0.sincemark()<<"  "; t0.mark();
-        cout<<i+1<<" "<<model0.nActive<<" "<<model0.energy<<endl;
+        cout<<t0.sincemark().wall<<"  "; t0.mark();
+        cout<<i+1<<" "<<model0.nActive<<" "<<energy<<endl;
     }
 
     // cout<<"\n\nNormal dmrg\n";
