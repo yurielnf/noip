@@ -37,12 +37,14 @@ int main(int argc, char **argv)
     bool star=true;
     int len=20;
     double dt=0.1;
+    double U=0.25;
     if (argc>=2) len=atoi(argv[1]);
     if (argc>=3) star=atoi(argv[2]);
     if (argc>=4) dt=atof(argv[3]);
-    auto model0=IRLM {.L=len, .t=0.5, .V=0.0, .U=0.25, .ed=-10};
-    auto model1=IRLM {.L=len, .t=0.5, .V=0.0, .U=0.25, .ed=-10, .connected=false};
-    auto model2=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=0.0};
+    if (argc>=5) U=atof(argv[4]);
+    auto model0=IRLM {.L=len, .t=0.5, .V=0.0, .U=U, .ed=-10};
+    auto model1=IRLM {.L=len, .t=0.5, .V=0.0, .U=U, .ed=-10, .connected=false};
+    auto model2=IRLM {.L=len, .t=0.5, .V=0.1, .U=U, .ed=0.0};
 
     cout<<"\n-------------------------- find the gs1 ----------------\n";
 
