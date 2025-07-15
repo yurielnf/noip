@@ -62,9 +62,9 @@ struct it_tdvp {
         }
 
         // TDVP sweep
-        energy = tdvp(psi,hamsys.ham,-dt,sweeps,
+        energy = itensor::tdvp(psi,hamsys.ham,-dt,sweeps,
                       {"Truncate",true,
-                       "DoNormalize", do_normalize,
+                       "DoNormalize", false,
                        "Quiet",true,
                        "Silent",silent,
                        "NumCenter",2,

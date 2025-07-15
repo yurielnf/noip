@@ -143,28 +143,45 @@ struct Fermionic {
         return {sites, hk};
     }
 
-    static arma::cx_mat cc_matrix(itensor::MPS const& gs, itensor::Fermion const& sites)
+    static arma::cx_mat cc_matrix(itensor::MPS const& gs, itensor::Fermion const& sites, int L=-1)
     {
-        auto ccz=correlationMatrixC(gs, sites,"Cdag","C");
+        if (L==-1) L=sites.length();
+        auto ccz=correlationMatrixC(gs, sites,"Cdag","C",itensor::range1(L));
         arma::cx_mat cc(ccz.size(), ccz.size());
         for(auto i=0u; i<ccz.size(); i++)
             for(auto j=0u; j<ccz[i].size(); j++)
-                cc(i,j)=ccz[i][j];
+                cc(i,j)=ccz.at(i).at(j);
         return cc;
+    }
+
+    static arma::cx_mat cc_matrix_kondo(itensor::MPS const& gs, itensor::Fermion const& sites, int L=-1)
+    {
+        itensor::MPS psi=gs;
+        {// apply the excitation
+            psi.position(1);
+            auto newA = op(sites, "A", 1)* psi(1);
+            newA.noPrime();
+            psi.ref(1)=newA;
+        }
+        double norma=itensor::norm(psi);
+        return cc_matrix(psi, sites, L)*pow(norma,2);
     }
 
     // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
     template<class T>
-    static std::vector<GivensRot<T>> NOGivensRot(arma::Mat<T> const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10)
+    static std::vector<GivensRot<T>> NOGivensRot(arma::Mat<T> const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10, int pfinal=-1)
     {
+        if (pfinal==-1 || pfinal>cc.n_rows-1) pfinal=cc.n_rows-1;
         using namespace arma;
         arma::Mat<T> cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
         std::vector<GivensRot<T>> gs;
         arma::Mat<T> evec;
         arma::vec eval;
         size_t d=blockSize;
-        for(auto p2=cc1.n_rows-1; p2>0u; p2--) {
+        pfinal -= nExclude;
+        for(auto p2=pfinal; p2>0u; p2--) {
             size_t p1= (p2+1>d) ? p2+1-d : 0u ;
+            if(p2+4>pfinal) p1=0;
             arma::Mat<T> cc2=cc1.submat(p1,p1,p2,p2);
             arma::eig_sym(eval,evec,cc2);
             // select the less active
@@ -177,11 +194,83 @@ struct Fermionic {
             {
                 //if (std::abs(v[i])<tolEvec) continue; // already done
                 auto b=i+p1;
-                auto g=GivensRot<T>::createFromPair(b,v[i],v[i+1]);
+                auto g=GivensRot<T>::createFromPair(b,v[i],v[i+1],true, &v[i+1]);
                 gs1.push_back(g);
-                v[i+1]=g.r;
             }
-            auto rot1=matrot_from_Givens(gs1);
+            auto rot1=matrot_from_Givens(gs1,p2+1);
+            cc1.submat(0,0,p2,p2)=rot1*cc1.submat(0,0,p2,p2)*rot1.t();
+            for(auto g : gs1) { g.b+=nExclude; gs.push_back(g); }
+        }
+        return gs;
+    }
+
+    // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
+    // from the wannierized inactive orbitals, move right the one with biggest <X>
+    template<class T>
+    static std::vector<GivensRot<T>> NOGivensRot_W(arma::Mat<T> const& cc, int nExclude=2, size_t blockSize=8, double tolActivity=1e-9, int pfinal=-1)
+    {
+        if (pfinal==-1) pfinal=cc.n_rows-1;
+        using namespace arma;
+        arma::Mat<T> cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
+        std::vector<GivensRot<T>> gs;
+        arma::Mat<T> evec;
+        arma::vec eval;
+        size_t d=blockSize;
+        pfinal -= nExclude;
+        for(auto p2=pfinal; p2>0u; p2--) {
+            size_t p1= (p2+1>d) ? p2+1-d : 0u ;
+            if(p2+4>pfinal) p1=0;
+            arma::Mat<T> cc2=cc1.submat(p1,p1,p2,p2);
+            arma::eig_sym(eval,evec,cc2);
+
+            // select the less active
+            size_t pos=0;
+            if (1-eval.back()<eval(0)) pos=eval.size()-1;
+            arma::Col<T> v=evec.col(pos);
+
+            arma::mat xOp=arma::diagmat(arma::regspace(0,cc2.n_rows-1));
+            double xBest=0;
+            {// group natural orbitals with occupation 0
+                std::vector<size_t> ieval0v;
+                for(auto i=0u; i<eval.size(); i++)
+                    if (eval[i]<tolActivity) ieval0v.push_back(i);
+                if (!ieval0v.empty()) {
+                    uvec ieval0=conv_to<uvec>::from(ieval0v);
+                    arma::Mat<T> evec0=evec.cols(ieval0);
+                    arma::Mat<T> X=evec0.t()* xOp * evec0;
+                    arma::vec Xeval0;
+                    arma::Mat<T> Xevec0;
+                    arma::eig_sym(Xeval0,Xevec0,X);
+                    xBest=Xeval0.back();
+                    v=evec0 * Xevec0.col(X.n_cols-1);
+                }
+            }
+            {// group natural orbitals with occupation 1
+                std::vector<size_t> ieval0v;
+                for(auto i=0u; i<eval.size(); i++)
+                    if (std::abs(eval[i]-1)<tolActivity) ieval0v.push_back(i);
+                if (!ieval0v.empty()) {
+                    uvec ieval0=conv_to<uvec>::from(ieval0v);
+                    arma::Mat<T> evec0=evec.cols(ieval0);
+                    arma::Mat<T> X=evec0.t()* xOp * evec0;
+                    arma::vec Xeval0;
+                    arma::Mat<T> Xevec0;
+                    arma::eig_sym(Xeval0,Xevec0,X);
+                    if (Xeval0.back()>xBest)
+                        v=evec0 * Xevec0.col(X.n_cols-1);
+                }
+            }
+
+            //if (1-std::abs(v.back())<tolEvec) continue; // already done
+            std::vector<GivensRot<T>> gs1;
+            for(auto i=0u; i+1<v.size(); i++)
+            {
+                // if (std::abs(v[i])*blockSize<tolActivity) continue; // already done
+                auto b=i+p1;
+                auto g=GivensRot<T>::createFromPair(b,v[i],v[i+1],true, &v[i+1]);
+                gs1.push_back(g);
+            }
+            auto rot1=matrot_from_Givens(gs1,p2+1);
             cc1.submat(0,0,p2,p2)=rot1*cc1.submat(0,0,p2,p2)*rot1.t();
             for(auto g : gs1) { g.b+=nExclude; gs.push_back(g); }
         }
@@ -194,68 +283,49 @@ struct Fermionic {
         auto best=std::numeric_limits<double>::max();
         int i0,j0;
         for(auto i=0u; i<a.size(); i++)
-            for(auto j=0; j<b.size(); j++)
+            for(auto j=0u; j<b.size(); j++)
                 if (auto d=std::abs(a[i]-b[j]); d<best) {best=d; i0=i; j0=j;}
         return {i0,j0};
     }
 
-    // // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
-    // static std::vector<GivensRot<>> GivensRotForMatrix(arma::mat const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10)
-    // {
-    //     using namespace arma;
-    //     arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
-    //     std::vector<GivensRot<>> gs;
-    //     arma::mat evec;
-    //     arma::vec eval;
-    //     auto evalRef=conv_to<std::vector<double>>::from( eig_sym(cc1) );
-    //     size_t d=blockSize;
-    //     for(auto p2=cc1.n_rows-1; p2>0u; p2--) {
-    //         size_t p1= (p2+1>d) ? p2+1-d : 0u ;
-    //         arma::mat cc2=cc1.submat(p1,p1,p2,p2);
-    //         arma::eig_sym(eval,evec,cc2);
-    //         // select the less active
-    //         auto [i0,j0]=bestMatching(conv_to<std::vector<double>>::from(eval), evalRef);
-    //         evalRef.erase(evalRef.begin()+j0);
-    //         arma::vec v=evec.col(i0);
-    //         if (1-std::abs(v.back())<tolEvec) continue; // already done
-    //         std::vector<GivensRot<>> gs1;
-    //         for(auto i=0u; i+1<v.size(); i++)
-    //         {
-    //             auto b=i+p1;
-    //             auto g=GivensRot<>::createFromPair(b,v[i],v[i+1]);
-    //             gs1.push_back(g);
-    //             v[i+1]=g.r;
-    //         }
-    //         auto rot1=matrot_from_Givens(gs1);
-    //         cc1.submat(0,0,p2,p2)=rot1*cc1.submat(0,0,p2,p2)*rot1.t();
-    //         for(auto g : gs1) { g.b+=nExclude; gs.push_back(g); }
-    //     }
-    //     return gs;
-    // }
 
-    // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
-    // static std::vector<GivensRot<>> GivensRotForRot(arma::mat rot)
-    // {
-    //     using namespace arma;
-    //     std::vector<GivensRot<>> givens;
-    //     for(auto p2=rot.n_cols-1; p2>0u; p2--) {
-    //         arma::vec v=rot.col(p2);
-    //         std::vector<GivensRot<>> gs1;
-    //         for(auto i=0u; i+1<=p2; i++)
-    //         {
-    //             auto g=GivensRot<>::createFromPair(i,v[i],v[i+1]);
-    //             gs1.push_back(g);
-    //             v[i+1]=g.r;
-    //         }
-    //         auto rot1=matrot_from_Givens(gs1);
-    //         rot.rows(0,p2)=rot1*rot.rows(0,p2);
-    //         for(auto g : gs1) givens.push_back(g);
-    //     }
-    //     // rot.clean(1e-15).print("rot after extracting the Givens rotations");
-    //     return givens;
-    // }
+    /// return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
+    /*static std::vector<GivensRot<>> GivensRotForMatrix(arma::mat const& cc, int nExclude=2, size_t blockSize=8, double tolEvec=1e-10)
+    {
+        using namespace arma;
+        arma::mat cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
+        std::vector<GivensRot<>> gs;
+        arma::mat evec;
+        arma::vec eval;
+        auto evalRef=conv_to<std::vector<double>>::from( eig_sym(cc1) );
+        size_t d=blockSize;
+        for(auto p2=cc1.n_rows-1; p2>0u; p2--) {
+            size_t p1= (p2+1>d) ? p2+1-d : 0u ;
+            arma::mat cc2=cc1.submat(p1,p1,p2,p2);
+            arma::eig_sym(eval,evec,cc2);
+            // select the less active
+            auto [i0,j0]=bestMatching(conv_to<std::vector<double>>::from(eval), evalRef);
+            evalRef.erase(evalRef.begin()+j0);
+            arma::vec v=evec.col(i0);
+            if (1-std::abs(v.back())<tolEvec) continue; // already done
+            std::vector<GivensRot<>> gs1;
+            for(auto i=0u; i+1<v.size(); i++)
+            {
+                auto b=i+p1;
+                auto g=GivensRot<>::createFromPair(b,v[i],v[i+1]);
+                gs1.push_back(g);
+                v[i+1]=g.r;
+            }
+            auto rot1=matrot_from_Givens(gs1);
+            cc1.submat(0,0,p2,p2)=rot1*cc1.submat(0,0,p2,p2)*rot1.t();
+            for(auto g : gs1) { g.b+=nExclude; gs.push_back(g); }
+        }
+        return gs;
+    }
+    */
 
-    // return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
+
+    /// return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
     template<class T>
     static std::vector<itensor::BondGate> NOGates1(itensor::Fermion const& sites, std::vector<GivensRot<T>> const& gs)
     {

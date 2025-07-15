@@ -44,12 +44,12 @@ struct GivensRot {
     using matrix22=typename arma::Mat<T>::template fixed<2,2>;
 
     size_t b;     ///< bond b --- b+1
-    T c=1, s=0, r=1;  ///< cos, sin, radius
+    T c=1, s=0;  ///< cos, sin, radius
 
     //GivensRot(size_t b_) : b(b_) {}
 
-    /// to transform J.t() (p,q)=(0,r). Adapted from eigen.tuxfamily.org
-    static GivensRot<T> createFromPair(size_t b, T p,  T q);
+    /// build the J s.t.  J * (p,q)=(0,r) is go_right=true. Adapted from eigen.tuxfamily.org
+    static GivensRot<T> createFromPair(size_t b, T p,  T q, bool go_right, T* r=nullptr);
 
     //double angle() const { return atan2(s,c); }
 
@@ -64,30 +64,51 @@ struct GivensRot {
         return evec * arma::diagmat(eval2) * evec.t();
     }
 
-    //void transposeInPlace() {s=-s;}
+    /// assuming that |z|=1 ??
+    GivensRot<cmpx> operator*(cmpx z) const { GivensRot<cmpx> g{.b=b}; g.c=c*z; g.s=s*z; return g;}
+
+    /// return transpose conjugate
+    GivensRot<T> dagger() const;
+
+    /// element-wise complex conjugate
+    GivensRot<T> conj() const;
 };
+
+template<class T>
+void applyGivens(GivensRot<T> const& g, arma::Mat<T>& A)
+{
+    auto Ar=A.rows(g.b,g.b+1).eval();
+    A.rows(g.b,g.b+1)=g.matrix()*Ar;
+}
+
+template<class T>
+void applyGivens(arma::Mat<T>& A, GivensRot<T> const& g)
+{
+    auto Ac=A.cols(g.b,g.b+1).eval();
+    A.cols(g.b,g.b+1) = Ac * g.matrix();
+}
 
 
 template<>
-GivensRot<double> GivensRot<double>::createFromPair(size_t b, double p,  double q)
+GivensRot<double> GivensRot<double>::createFromPair(size_t b, double p,  double q, bool go_right, double *r)
 {
     using Scalar=double;
     using std::sqrt;
     using std::abs;
 
     GivensRot<double> g {.b=b};
-    std::swap(p,q); // to eliminate the p instead of q.
+    if (go_right) std::swap(p,q); // to eliminate the p instead of q.
     if(q==Scalar(0))
     {
         g.c = p<Scalar(0) ? Scalar(-1) : Scalar(1);
         g.s = Scalar(0);
-        g.r = abs(p);
+        if (r) *r = abs(p);
     }
     else if(p==Scalar(0))
     {
         g.c = Scalar(0);
         g.s = q<Scalar(0) ? Scalar(1) : Scalar(-1);
-        g.r = abs(q);
+        if (r) *r = abs(q);
     }
     else if(abs(p) > abs(q))
     {
@@ -97,7 +118,7 @@ GivensRot<double> GivensRot<double>::createFromPair(size_t b, double p,  double 
             u = -u;
         g.c = Scalar(1)/u;
         g.s = -t * g.c;
-        g.r = p * u;
+        if (r) *r = p * u;
     }
     else
     {
@@ -107,16 +128,23 @@ GivensRot<double> GivensRot<double>::createFromPair(size_t b, double p,  double 
             u = -u;
         g.s = -Scalar(1)/u;
         g.c = -t * g.s;
-        g.r = q * u;
+        if (r) *r = q * u;
     }
+    if (go_right) { g.s=-g.s; }
     return g;
 }
 
 template<>
-GivensRot<double>::matrix22 GivensRot<double>::matrix() const { return {{c, s},{-s, c}}; }
+GivensRot<double>::matrix22 GivensRot<double>::matrix() const { return {{c, -s},{s, c}}; }
 
 template<>
-GivensRot<cmpx> GivensRot<cmpx>::createFromPair(size_t b, cmpx p, cmpx q)
+GivensRot<double> GivensRot<double>::dagger() const { return {.b=b, .c=c, .s=-s}; }
+
+template<>
+GivensRot<double> GivensRot<double>::conj() const { return *this; }
+
+template<>
+GivensRot<cmpx> GivensRot<cmpx>::createFromPair(size_t b, cmpx p, cmpx q, bool go_right, cmpx *r)
 {
     using Scalar=cmpx;
     using RealScalar=double;
@@ -125,18 +153,18 @@ GivensRot<cmpx> GivensRot<cmpx>::createFromPair(size_t b, cmpx p, cmpx q)
     using std::conj;
 
     GivensRot<cmpx> g {.b=b};
-    std::swap(p,q); // to eliminate the p instead of q.
+    if (go_right) std::swap(p,q); // to eliminate the p instead of q.
     if(q==Scalar(0))
     {
         g.c = std::real(p)<0 ? Scalar(-1) : Scalar(1);
         g.s = 0;
-        g.r = g.c * p;
+        if (r) *r = g.c * p;
     }
     else if(p==Scalar(0))
     {
         g.c = 0;
         g.s = -q/abs(q);
-        g.r = abs(q);
+        if (r) *r = abs(q);
     }
     else
     {
@@ -155,7 +183,7 @@ GivensRot<cmpx> GivensRot<cmpx>::createFromPair(size_t b, cmpx p, cmpx q)
 
             g.c = Scalar(1)/u;
             g.s = -qs*conj(ps)*(g.c/p2);
-            g.r = p * u;
+            if (r) *r = p * u;
         }
         else
         {
@@ -172,30 +200,122 @@ GivensRot<cmpx> GivensRot<cmpx>::createFromPair(size_t b, cmpx p, cmpx q)
             ps = p/p1;
             g.c = p1/u;
             g.s = -conj(ps) * (q/u);
-            g.r = ps * u;
+            if (r) *r = ps * u;
         }
     }
+    if (go_right) { g.s=-conj(g.s); } // assuming g.c is real!!
+
     return g;
 }
 
 template<>
-GivensRot<cmpx>::matrix22 GivensRot<cmpx>::matrix() const { return {{c, s},{-std::conj(s), std::conj(c)}}; }
+GivensRot<cmpx>::matrix22 GivensRot<cmpx>::matrix() const { return {{std::conj(c), -std::conj(s)},{s, c}}; }
+
+template<>
+GivensRot<cmpx> GivensRot<cmpx>::dagger() const { return {.b=b, .c=std::conj(c), .s=-s}; }
+
+template<>
+GivensRot<cmpx> GivensRot<cmpx>::conj() const { return {.b=b, .c=std::conj(c), .s=std::conj(s)}; }
+
+
+//------------------------- set of Givens rotations -----------------------------------------
+
+template<class T>
+void applyGivens(std::vector<GivensRot<T>> const& gs,arma::Mat<T>& A)
+{
+    for(auto const& g:gs)
+        applyGivens(g,A);
+}
+
+template<class T>
+void applyGivens(arma::Mat<T>& A, std::vector<GivensRot<T>> const& gs)
+{
+    for(auto it=gs.crbegin(); it!=gs.crend(); ++it)
+        applyGivens(A,*it);
+}
 
 
 template<class T>
-arma::Mat<T> matrot_from_Givens(std::vector<GivensRot<T>> const& gates, size_t n=0)
+arma::Mat<T> matrot_from_Givens(std::vector<GivensRot<T>> const& gates, size_t n)
 {
-    if (n==0) {
+    if (n==0) { // read the length from the gates
         for(const GivensRot<T>& g : gates) if (g.b>n) n=g.b;
         n+=2;
     }
     arma::Mat<T> rot(n,n, arma::fill::eye);
     for(int i=gates.size()-1; i>=0; i--) { // apply to the right in reverse
-//    for(auto i=0u; i<gates.size(); i++) {
         const GivensRot<T>& g=gates[i];
-        rot.submat(0,g.b,n-1,g.b+1) = rot.submat(0,g.b,n-1,g.b+1) * g.matrix();
+        rot.cols(g.b,g.b+1) = rot.cols(g.b,g.b+1).eval() * g.matrix();
     }
     return rot;
+}
+
+
+/// generate the corresponding Givens rotations: every column is one layer of gates
+template<class T>
+static std::vector<GivensRot<T>> GivensRotForRot_left(arma::Mat<T> rot)
+{
+    std::vector<GivensRot<T>> givens;
+    for(int j=0u; j<rot.n_cols; j++) {
+        arma::Col<T> v=rot.col(j);
+        std::vector<GivensRot<T>> gs1;
+        for(int i=v.size()-2; i>=j; i--)
+        {
+            auto g=GivensRot<T>::createFromPair(i,v[i],v[i+1], false, &v[i]);
+            gs1.push_back(g);
+        }
+        applyGivens(gs1,rot);
+        for(auto g : gs1) givens.push_back(g);
+    }
+    return givens;
+}
+
+// return a list of local 2-site gates: see fig5a of PRB 92, 075132 (2015)
+template<class T>
+std::vector<GivensRot<T>> GivensRotForCC_right(arma::Mat<T> cc, int pfinal=-1)
+{
+    if (pfinal==-1 || pfinal>cc.n_rows-1) pfinal=cc.n_rows-1;
+    using namespace arma;
+    std::vector<GivensRot<T>> givens;
+    arma::Mat<T> evec;
+    arma::vec eval;
+    size_t d=cc.n_rows;
+    for(auto p2=pfinal; p2>0u; p2--) {
+        size_t p1= (p2+1>d) ? p2+1-d : 0u ;
+        if(p2+4>pfinal) p1=0;
+        arma::Mat<T> cc2=cc.submat(p1,p1,p2,p2);
+        arma::eig_sym(eval,evec,cc2);
+        // select the less active
+        size_t pos=0;
+        if (1-eval.back()<eval(0)) pos=eval.size()-1;
+        arma::Col<T> v=evec.col(pos);
+        std::vector<GivensRot<T>> gs1;
+        for(auto i=0u; i+1<v.size(); i++)
+        {
+            auto b=i+p1;
+            auto g=GivensRot<T>::createFromPair(b,v[i],v[i+1],true, &v[i+1]);
+            gs1.push_back(g);
+        }
+        auto rot1=matrot_from_Givens(gs1,p2+1);
+        cc.submat(0,0,p2,p2)=rot1*cc.submat(0,0,p2,p2)*rot1.t();
+        for(auto g : gs1) givens.push_back(g);
+    }
+    return givens;
+}
+
+template<class T>
+void GivensDaggerInPlace(std::vector<GivensRot<T>> &givens)
+{
+    for(auto& g:givens) g=g.dagger();
+    std::reverse(givens.begin(),givens.end());
+}
+
+template<class T>
+std::vector<GivensRot<T>> GivensDagger(std::vector<GivensRot<T>> const& givens)
+{
+    auto out=givens;
+    GivensDaggerInPlace(out);
+    return out;
 }
 
 

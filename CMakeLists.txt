@@ -17,6 +17,8 @@ add_library(${PROJECT_NAME} STATIC
     it_tdvp_error.h
     irlm_wilson_chain.h
     givens_rotation.h
+    iscboson.h
+    irlm_gs.h
 )
 
 target_include_directories(${PROJECT_NAME} PUBLIC

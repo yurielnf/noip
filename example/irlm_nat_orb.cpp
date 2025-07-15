@@ -19,12 +19,12 @@ auto computeGS(HamSys const& sys)
 {
     cout<<"bond dimension of H: "<< maxLinkDim(sys.ham) << endl;
     it_dmrg sol_gs {sys};
-    sol_gs.bond_dim=512;
-    sol_gs.noise=1e-5;
+    sol_gs.bond_dim=64;
+    sol_gs.noise=1e-3;
     cout<<"\nsweep bond-dim energy\n";
     for(auto i=0u; i<30; i++) {
-        if (i==10) sol_gs.noise=1e-7;
-        else if (i==26) sol_gs.noise=1e-9;
+        if (i==10) { sol_gs.noise=1e-7; sol_gs.bond_dim=256; }
+        else if (i==26) { sol_gs.noise=1e-9; sol_gs.bond_dim=512; }
         else if (i==28) sol_gs.noise=0;
         if (false && i==11) {
             // Global subspace expansion
@@ -49,6 +49,19 @@ auto computeGS(HamSys const& sys)
     return sol_gs;
 }
 
+
+auto prepareSlater(itensor::Fermion const& sites, arma::vec ek, int nPart)
+{
+    auto state = itensor::InitState(sites,"0");
+    arma::uvec iek=arma::sort_index(ek);
+    double energy=0;
+    for(int j = 0; j < nPart; j++) {
+        state.set(iek[j]+1,"1");
+        energy += ek[iek[j]];
+    }
+    std::cout << " Slater energy: " << energy << std::endl;
+    return itensor::MPS(state);
+}
 
 /// return a rotation rot such that rot(:,B).t()*kin*rot(:,B) is diagonal where B are the inactive eigenvectors of cc (with eval=0 or 1).
 template<class T>
@@ -81,7 +94,7 @@ arma::Mat<T> MagicRotation(arma::Mat<T> const& cc, arma::Mat<T> const& kin, doub
         Mat<T> evec;
         vec eval;
         eig_sym(eval,evec,X);
-        { //sort by position
+        if (false){ //sort by position
             arma::mat xOp=arma::diagmat(arma::regspace(0,cc.n_rows-1));
             vec x=arma::real((evec.t()*rot1.t()*xOp*rot1*evec).eval().diag());
             uvec iev=stable_sort_index(x);
@@ -107,8 +120,10 @@ arma::Mat<T> MagicRotation(arma::Mat<T> const& cc, arma::Mat<T> const& kin, doub
 }
 
 
-/// ./irlm_nat_orb [len=20] [hamRestricted=1] [dt=0.1] [circuit_dt=0.1]
-int main(int argc, char **argv)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(IRLM,L,t,V,U,ed,connected)
+
+
+int main()
 {
     using namespace itensor;
     using namespace arma;
@@ -122,181 +137,187 @@ int main(int argc, char **argv)
         j=json::parse(in);
     }
 
+    cout<<setw(4)<<j;
 
-    cout<<"irlm_nat_orb [len=20] [hamRestricted=1] [dt=0.1] [circuit_dt=0.1]"<<endl;
-    int len=j.at("irlm").at("L"), nExclude=2;
-    double U=j.at("irlm").at("U");
-    auto model1=IRLM_ip {IRLM {.L=len, .t=0.5, .V=0.0, .U=U, .ed=-10, .connected=false}};
-    auto model2=IRLM_ip {IRLM {.L=len, .t=0.5, .V=0.1, .U=U, .ed=0.0}};
-
-    cout<<"\n-------------------------- solve the gs2 ----------------\n" << setprecision(15);
-
-    matriz rot = model2.irlm.rotStar() * cx_double(1,0);
-    auto sol2a=computeGS(model2.Ham(rot));
-
-    //arma::mat xOp=arma::diagmat(arma::regspace(0,len-1));
-    matriz cc=Fermionic::cc_matrix(sol2a.psi, sol2a.hamsys.sites) * cx_double(1,0);  ///<------------- real!
-    //cc.save("cc_L"s+to_string(len)+"_gs2_star.txt",arma::raw_ascii);
-    //rot.save("orb_L"s+to_string(len)+"_gs2_star.txt",arma::raw_ascii);
-
-    arma::mat K;
-    {
-        arma::mat Umat;
-        std::tie(K,Umat)=model2.irlm.matrices();
-    }
-
-
-    cout<<"\n-------------------------- rotate the H to natural orbitals: find the gs again ----------------\n";
-
-    double tolGs2=j.at("circuit").at("tolGs2");
-    {        
-        matriz kin=rot.t()*K*rot;
-        matriz rot1p=MagicRotation<matriz::value_type>(cc.submat(nExclude,nExclude,len-1,len-1),
-                                           kin.submat(nExclude,nExclude,len-1,len-1),
-                                           tolGs2);
-        matriz rot1(arma::size(rot),arma::fill::eye);
-        rot1.submat(nExclude,nExclude,len-1,len-1)=rot1p;
-        rot = rot*rot1;
-    }
-
-    auto sys2b=model2.Ham(rot);
-    auto sol2b=computeGS(sys2b);
-
-    cc=Fermionic::cc_matrix(sol2b.psi, sol2b.hamsys.sites) * cx_double(1,0);
-    cc.save("cc_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
-    rot.save("orb_L"s+to_string(len)+"_gs2.txt",arma::raw_ascii);
+    bool save=j.value("save",false);
+    bool verbose=j.at("verbose");
     int circuit_nImp=j.at("circuit").at("nImp");
     int circuit_nSite=j.at("circuit").at("nSite");
     double circuit_dt=j.at("circuit").at("dt");
-    if (circuit_nImp==-1)
-    {
-        vec ni=arma::real(cc.diag());
-        circuit_nImp=arma::find(ni>tolGs2 && ni<1-tolGs2).eval().size();  // number of active orbitals in the gs of model2
-        if (circuit_nImp>12) circuit_nImp=12;
-        matriz cc1=cc.submat(nExclude,nExclude,cc.n_rows-1,cc.n_cols-1);
-        arma::vec eval=arma::eig_sym(cc1);
-        arma::vec activity(eval.size());
-        for(auto i=0u; i<eval.size(); i++)
-            activity[i]=-std::min(eval[i], -eval[i]+1);    //activity sorting
-        arma::uvec iev=arma::stable_sort_index(activity.clean(1e-15));
-        tolGs2=sqrt(activity(iev.at(circuit_nImp-nExclude-1))*activity(iev.at(circuit_nImp-nExclude))); // in the middle (logscale)
-    }
-    cout<<"\nNumber of active orbitals of the future gs, tol: "<<circuit_nImp<<", "<<tolGs2<<endl;
-
-    cout<<"\n-------------------------- find the gs1 in NO2 ----------------\n";
-    {        
-        matriz kin=rot.t()*K*rot;
-        matriz rot1p=MagicRotation<matriz::value_type>(cc.submat(circuit_nImp,circuit_nImp,len-1,len-1),
-                                      kin.submat(circuit_nImp,circuit_nImp,len-1,len-1),
-                                      tolGs2);
-        matriz rot1(arma::size(rot),arma::fill::eye);
-        rot1.submat(circuit_nImp,circuit_nImp,len-1,len-1)=rot1p;
-        rot = rot*rot1;
-    }
-    auto sys1a=model1.Ham(rot);
-    auto sol1a=computeGS(sys1a);
-    cc=Fermionic::cc_matrix(sol1a.psi, sol1a.hamsys.sites)* cx_double(1,0);
-
-    //cc.save("cc_L"s+to_string(len)+"_gs1.txt",arma::raw_ascii);
-    //rot.save("orb_L"s+to_string(len)+"_gs1.txt",arma::raw_ascii);
-    //exportPsi(sol1b.psi,"psi_t"s+to_string(0)+".txt");
-
-    cout<<"\n-------------------------- find again the gs1 in NO1 while keeping the active NO2 ----------------\n";
-    if (true) { // circuit1
-        auto givens=Fermionic::NOGivensRot(cc,circuit_nImp,circuit_nSite);
-        auto rot1=matrot_from_Givens(givens,cc.n_rows);
-        rot = rot*rot1.st();
-        cc=rot1*cc*rot1.t();
-    }
-    auto sys1b=model1.Ham(rot);
-    auto sol1b=computeGS(sys1b);
-    cc=Fermionic::cc_matrix(sol1b.psi, sol1b.hamsys.sites)* cx_double(1,0);
-
-    cc.save("cc_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
-    rot.save("orb_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
-
-
-    cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n";
+    double circuit_tol=j.at("circuit").at("tol");
     double dt=j.at("tdvp").at("dt");
+
+    IRLM m1 = j.at("irlm");
+    int len=m1.L, nExclude=2;
+    itensor::Fermion sites(len, {"ConserveNf",true});
+    auto model0=IRLM_ip {sites, j.at("irlm0"), dt};
+    auto model=IRLM_ip {sites, j.at("irlm"), dt};
+
+    cout<<"\n-------------------------- solve the gs1 ----------------\n" << setprecision(15);
+
+    arma::mat K=model0.irlm.matrices().first;
+    arma::cx_mat rot = model0.irlm.rotStar() * cx_double(1,0);
+
+    arma::vec ek=arma::real((rot.t()*K*rot).eval().diag().as_col());
+    ek[1] += model0.irlm.U;
+    auto psi=prepareSlater(sites, ek, len/2);
+    matriz cc=Fermionic::cc_matrix(psi, sites);
+    auto cck=Fermionic::cc_matrix_kondo(psi, sites);
+
+    if (save) cc.save("cc_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
+    if (save) cck.save("cck_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
+    if (save) rot.save("orb_L"s+to_string(len)+"_t"+to_string(0)+".txt",arma::raw_ascii);
+
+
+    cout<<"\n-------------------------- evolve the psi with new Hamiltonian ----------------\n"; cout.flush();
     double tolActivity=j.at("ip").at("tolActivity");
-    auto psi=sol1b.psi;
 
     ofstream out("irlm_no_L"s+to_string(len)+".txt");
     out<<"time M m energy n0 cd nActive\n"<<setprecision(14);
-    double n0=itensor::expectC(psi, sol1b.hamsys.sites, "N",{1}).at(0).real();
+    double n0=itensor::expectC(psi, sites, "N",{1}).at(0).real();
     auto cdOp=[&](itensor::Fermion const& sites) {
         itensor::AutoMPO ampo(sites);
         ampo += "Cdag",1,"C",2;
         ampo += "Cdag",2,"C",1;
         return itensor::toMPO(ampo);
     };
-    double cd=itensor::innerC(psi, cdOp(sol1b.hamsys.sites), psi).real();
+    double cd=itensor::innerC(psi, cdOp(sites), psi).real();
     vec ni=arma::real(cc.diag());
     arma::uvec active=arma::find(ni>tolActivity && ni<1-tolActivity);
-    out<<"0 "<< maxLinkDim(sys1b.ham) <<" "<<maxLinkDim(sol1b.psi)<<" "<<sol1b.energy<<" "<<n0<<" "<<cd<<" "<<active.size()<<endl;
-    auto model2_ip=IRLM_ip{model2};
+    out<<"0 "<< 0 <<" "<<maxLinkDim(psi)<<" "<<0<<" "<<n0<<" "<<cd<<" "<<active.size()<<endl;
+    auto model2_ip=IRLM_ip{model};
     for(auto i=0; i*dt<=len; i++) {
-        cout<<"-------------------------- iteration "<<i+1<<" --------\n";
+        if (verbose) cout<<"-------------------------- iteration "<<i+1<<" --------\n";
         itensor::cpu_time t0;
         int nImpIp=map<string,int> {{"circuit", circuit_nImp},
-                                    {"activity", active.size()},
+                                    {"activity", std::max(circuit_nImp,(int)active.size())},
                                     {"none", len}
                                    }.at(j.at("ip").at("type"));
-        auto sys2 = model2_ip.HamIP(rot,nImpIp,dt);
-        if (nImpIp!=len) rot = rot * model2_ip.rotIP(rot,nImpIp,dt);
-        cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
+        //auto [sys2,givens,Kip] = model2_ip.HamIP_f(rot,nImpIp,dt, j.at("extract_f"));
+        auto hip=model2_ip.HamIP_f3(rot, nImpIp, ni, dt, j.at("extract_f"),tolActivity);
+//        auto [sys2,givens,Kip] = model2_ip.HamIPS(rot, nImpIp, dt, j.at("extract_f"));
+        psi.replaceSiteInds(hip.ham.sites.inds());
+        if (hip.from != hip.to && hip.to!=len) { // swap sites
+            itensor::AutoMPO ampo(sites);
+            ampo += "Cdag",hip.from+1, "C",hip.to+1;
+            ampo += "Cdag",hip.to+1,"C",hip.from+1;
+            auto op = itensor::toMPO(ampo);
+            psi = applyMPO(op,psi);
+            psi.replaceSiteInds(hip.ham.sites.inds());
+            cc.swap_cols(hip.from, hip.to);
+            cc.swap_rows(hip.from, hip.to);
+            if (save) {
+                cck.swap_cols(hip.from, hip.to);
+                cck.swap_rows(hip.from, hip.to);
+            }
+        }
+        // arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag()).print("ni when hip");
+        if (nImpIp!=len) rot = hip.rot;
+//        if (nImpIp!=len) { rot = rot * matrot_from_Givens(givens,len).st();  }
+        if (verbose) cout<<"Hamiltonian mpo:"<<t0.sincemark()<<endl;
         t0.mark();
-        it_tdvp sol {sys2, psi};
-        sol.dt={0,dt};
-        sol.bond_dim=512;
-        sol.rho_cutoff=1e-14;
-        sol.silent=true;
-        sol.epsilonM=j.at("tdvp").at("epsilonM");
-        sol.nKrylov=j.at("tdvp").at("nKrylov");
-        sol.enrichByFit = false; //(i%10!=0);
 
-        sol.iterate();
-        cout<<"tdvp time"<<t0.sincemark()<<endl;
+        if (j.at("extract_f")) {// the circuit to extract f orbitals
+            auto gates=Fermionic::NOGates(hip.ham.sites,hip.givens);
+            gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "Normalize",false,"ShowPercent",false});
+            if (verbose) cout<<"circuit-f:"<<t0.sincemark()<<endl;
+            t0.mark();
+        }
+
+        // if (verbose) arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag()).print("ni after f");
+
+        if (j.at("use_tdvp")) {// tdvp
+            it_tdvp sol {hip.ham, psi};
+            sol.dt={0,dt};
+            sol.bond_dim=512;
+            sol.rho_cutoff=1e-14;
+            sol.silent=true;
+            sol.epsilonM=j.at("tdvp").at("epsilonM");
+            sol.nKrylov=j.at("tdvp").at("nKrylov");
+            sol.enrichByFit = false; //(i%10!=0);
+
+            sol.iterate();
+            psi=sol.psi;
+        }
+        else {
+            //Kip.clean(1e-13).print("Kip");
+            //cout<<"U="<<model2_ip.irlm.U<<endl;
+            auto gates=model2_ip.TrotterGatesExp(hip.Kip,3,dt);
+            // auto gates=model2_ip.TrotterGates(Kip,3,dt);
+            //Time evolve, overwriting psi when done
+            gateTEvol(gates,1,1,psi,{"Cutoff=",circuit_tol,"Quiet=",true, "Normalize",false,"ShowPercent",false});
+        }
+
+        // if (verbose) arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag()).print("ni after Trotter");
+
+        if (false && j.at("extract_f")) {// the circuit to extract f orbitals applied in reverse
+            auto givens=hip.givens;
+            std::reverse(givens.begin(), givens.end());
+            for(auto& g:givens) g=g.dagger();
+            auto gates=Fermionic::NOGates(hip.ham.sites,givens);
+            gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "Normalize",false,"ShowPercent",false});
+            if (verbose) cout<<"circuit-f:"<<t0.sincemark()<<endl;
+            t0.mark();
+        }
+
+        if (verbose) cout<<"tdvp time"<<t0.sincemark()<<endl;
         t0.mark();
 
-        psi=sol.psi;
-        cc=Fermionic::cc_matrix(psi, sol.hamsys.sites)* cx_double(1,0);
-        cout<<"cc computation:"<<t0.sincemark()<<endl;
+
+        // cc=Fermionic::cc_matrix(psi, hip.ham.sites);
+        cc.submat(0,0,hip.from,hip.from)=Fermionic::cc_matrix(psi, hip.ham.sites, hip.from+1)* cx_double(1,0);
+        if (save) {
+            cck=cc*cc(0,0);
+            cck.submat(0,0,hip.from,hip.from)=Fermionic::cc_matrix_kondo(psi, hip.ham.sites, hip.from+1)* cx_double(1,0);
+        }
+        if (verbose) cout<<"cc computation:"<<t0.sincemark()<<endl;
         t0.mark();
-        if (std::abs(i*dt-std::round(i*dt/circuit_dt)*circuit_dt) < 0.5*dt) {        
-            auto givens=Fermionic::NOGivensRot(cc,circuit_nImp,circuit_nSite);
+
+        if (std::abs(i*dt-std::round(i*dt/circuit_dt)*circuit_dt) < 0.5*dt) {
+            auto givens=Fermionic::NOGivensRot(cc,circuit_nImp,circuit_nSite,tolActivity, hip.from);
 //            auto givens=Fermionic::GivensRotForMatrix(cc,circuit_nImp,20);
-            auto rot1=matrot_from_Givens(givens,cc.n_rows);
             //real((rot1 * cc * rot1.t()).eval().clean(1e-10).submat(circuit_nImp,circuit_nImp,cc.n_rows-1,cc.n_cols-1)).print("rot1*cc*rot1.t()");
-            auto gates=Fermionic::NOGates(sol.hamsys.sites,givens);
-            gateTEvol(gates,1,1,psi,{"Cutoff",1e-10,"Quiet",true, "DoNormalize",true});
-            cout<<"circuit1:"<<t0.sincemark()<<endl;
+            auto gates=Fermionic::NOGates(hip.ham.sites,givens);
+            if (verbose) cout<<"circuit1 algebra:"<<t0.sincemark()<<endl;
+            gateTEvol(gates,1,1,psi,{"Cutoff",circuit_tol,"Quiet",true, "Normalize",false,"ShowPercent",false});
+            if (verbose) cout<<"circuit1:"<<t0.sincemark()<<endl;
             t0.mark();
             //matriz ccr=Fermionic::cc_matrix(psi, sol.hamsys.sites);
             //real(ccr.clean(1e-7).submat(circuit_nImp,circuit_nImp,cc.n_rows-1,cc.n_cols-1)).print("cc after rot");
-            rot = rot*rot1.st();
-            cc=rot1*cc*rot1.t();
-            psi.orthogonalize({"Cutoff",1e-9});
-            vec ni=arma::real(cc.diag());
+            auto rot1=matrot_from_Givens(givens,hip.from+1);
+            rot.cols(0,hip.from) = rot.cols(0,hip.from).eval()*rot1.st();
+            cc.cols(0,hip.from)=cc.cols(0,hip.from).eval()*rot1.t();
+            cc.rows(0,hip.from)=rot1*cc.rows(0,hip.from).eval();
+            if (save) {
+                cck.cols(0,hip.from)=cck.cols(0,hip.from).eval()*rot1.t();
+                cck.rows(0,hip.from)=rot1*cck.rows(0,hip.from).eval();
+            }
+            //psi.orthogonalize({"Cutoff",circuit_tol});
+            ni=arma::real(cc.diag());
+            // ni=arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag());
             active=arma::find(ni>tolActivity && ni<1-tolActivity);
 
-            cout<<"active: "<<active.size()<<endl;
+            if (verbose) {
+                cout<<"active: "<<active.size()<<endl;
+                for(auto i=0; i<psi.length(); i++)
+                    cout<<itensor::leftLinkIndex(psi,i+1).dim()<<" ";
+                cout<<endl;
+            }
 
-            for(auto i=0; i<psi.length(); i++)
-                cout<<itensor::leftLinkIndex(psi,i+1).dim()<<" ";
-            cout<<endl;
+            // if (verbose) arma::real(Fermionic::cc_matrix(psi, hip.ham.sites).diag()).print("ni after circuit");
         }
 
 
-        double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
-        cd=itensor::innerC(sol.psi, cdOp(sol.hamsys.sites), sol.psi).real();
-        out<<(i+1)*abs(sol.dt)<<" "<< maxLinkDim(sys2.ham) <<" "<<maxLinkDim(psi)<<" "<<sol.energy<<" "<<n0<<" "<<cd<<" "<<active.size()<<endl;
+        double n0=itensor::expectC(psi, hip.ham.sites, "N",{1}).at(0).real();
+        cd=itensor::innerC(psi, cdOp(hip.ham.sites), psi).real();
+        out<<(i+1)*abs(dt)<<" "<< maxLinkDim(hip.ham.ham) <<" "<<maxLinkDim(psi)<<" "<<0<<" "<<n0<<" "<<cd<<" "<<active.size()<<endl;
 
-        if (i>0 && i%100==0) {
+        if (save && (i>0) && (i%100==0)) {
             cc.save("cc_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
+            cck.save("cck_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
             rot.save("orb_L"s+to_string(len)+"_t"+to_string(i)+".txt",arma::raw_ascii);
             //exportPsi(psi,"psi_t"s+to_string(i)+".txt");
-        }
+        }        
     }
 
     return 0;
