@@ -58,6 +58,7 @@ int main(int argc, char **argv)
     sol.dt={0,dt};
     sol.bond_dim=1024;
     sol.rho_cutoff=1e-14;
+    sol.epsilonM=1e-10;
     sol.silent=true;
     sol.enrichByFit = false;
     ofstream out("irlm_star_L"s+to_string(sol.hamsys.ham.length())+".txt");
@@ -72,9 +73,9 @@ int main(int argc, char **argv)
     double cd=itensor::innerC(sol.psi, cdOp(sol.hamsys.sites), sol.psi).real();
     out<<"0 "<< maxLinkDim(sys2.ham)<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<" "<<cd<<endl;
     for(auto i=0; i*dt<=len; i++) {
-        sol.epsilonM=(i%1==0) ? 1e-7 : 0;
+        // sol.epsilonM=(i%1==0) ? 1e-7 : 0;
         sol.iterate();
-        if (i%100==0) {
+        if (false && i%100==0) {
             auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
             string filename="eval_L"s+to_string(sol.hamsys.ham.length())+"_t"+to_string(i)+".txt";
             arma::eig_sym(cc).save(filename,arma::raw_ascii);
