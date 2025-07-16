@@ -58,16 +58,16 @@ int main(int argc, char **argv)
     out<<"time M m energy n0\n"<<setprecision(14);
     out<<"0 0 0 0 "<< corr(0,0,0).real() <<" "<< (corr(0,1,0)+corr(1,0,0)).real() <<endl;
 
-    // for(auto i=0; i*dt<=len; i++) {
-    //     double t=dt*(i+1);
-    //     out<<t<<" 0 0 0 "<< corr(0,0,t).real() <<" "<< (corr(0,1,t)+corr(1,0,t)).real() <<endl;
-    // }
-
-    for(int ti:{2000,6000,10000}) {
-        arma::cx_mat cc=corr_all((ti+1)*dt);
-        arma::real(cc.diag()).eval().save("ni_L"s+to_string(len)+"_t"+to_string(ti)+".txt",arma::raw_ascii);
-        arma::real(arma::square(arma::abs(cc.col(0)))).eval().save("ci0_abs2_L"s+to_string(len)+"_t"+to_string(ti)+".txt",arma::raw_ascii);
+    for(auto i=0; i*dt<=len; i++) {
+        double t=dt*(i+1);
+        out<<t<<" 0 0 0 "<< corr(0,0,t).real() <<" "<< (corr(0,1,t)+corr(1,0,t)).real() <<endl;
     }
+
+    // for(int ti:{2000,6000,10000}) {
+    //     arma::cx_mat cc=corr_all((ti+1)*dt);
+    //     arma::real(cc.diag()).eval().save("ni_L"s+to_string(len)+"_t"+to_string(ti)+".txt",arma::raw_ascii);
+    //     arma::real(arma::square(arma::abs(cc.col(0)))).eval().save("ci0_abs2_L"s+to_string(len)+"_t"+to_string(ti)+".txt",arma::raw_ascii);
+    // }
 
     return 0;
 }

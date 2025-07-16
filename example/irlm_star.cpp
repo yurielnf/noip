@@ -31,7 +31,7 @@ auto computeGS(HamSys const& sys, itensor::MPS psi={})
 }
 
 
-/// ./irlm_star <len> [star=true] [dt=0.1]
+/// ./irlm_star <len> [star=true] [dt=0.1] [U=0.25]
 int main(int argc, char **argv)
 {
     bool star=true;
@@ -59,11 +59,11 @@ int main(int argc, char **argv)
     it_tdvp sol {sys2, sol_gs.psi};
     sol.dt={0,dt};
     sol.bond_dim=1024;
-    sol.rho_cutoff=1e-14;
-    sol.epsilonM=1e-10;
+    sol.rho_cutoff=1e-12;
+    sol.epsilonM=0; //1e-10;
     sol.silent=true;
     sol.enrichByFit = false;
-    ofstream out("irlm_star_L"s+to_string(sol.hamsys.ham.length())+".txt");
+    ofstream out("irlm_star_L"s+to_string(sol.hamsys.ham.length())+"_dt"+to_string(dt)+".txt");
     out<<"sweep bond-dim energy n0\n"<<setprecision(14);
     double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
     auto cdOp=[&](itensor::Fermion const& sites) {
