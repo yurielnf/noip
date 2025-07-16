@@ -63,7 +63,7 @@ int main(int argc, char **argv)
     sol.epsilonM=0; //1e-10;
     sol.silent=true;
     sol.enrichByFit = false;
-    ofstream out("irlm_star_L"s+to_string(sol.hamsys.ham.length())+"_dt"+to_string(dt)+".txt");
+    ofstream out("irlm_star_L"s+to_string(sol.hamsys.ham.length())+".txt");
     out<<"sweep bond-dim energy n0\n"<<setprecision(14);
     double n0=itensor::expectC(sol.psi, sol.hamsys.sites, "N",{1}).at(0).real();
     auto cdOp=[&](itensor::Fermion const& sites) {
