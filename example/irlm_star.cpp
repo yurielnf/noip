@@ -31,18 +31,20 @@ auto computeGS(HamSys const& sys, itensor::MPS psi={})
 }
 
 
-/// ./irlm_star <len> [star=true] [dt=0.1]
+/// ./irlm_star <len> [star=true] [dt=0.1] [U=0.25]
 int main(int argc, char **argv)
 {
     bool star=true;
     int len=20;
     double dt=0.1;
+    double U=0.25;
     if (argc>=2) len=atoi(argv[1]);
     if (argc>=3) star=atoi(argv[2]);
     if (argc>=4) dt=atof(argv[3]);
-    auto model0=IRLM {.L=len, .t=0.5, .V=0.0, .U=0.25, .ed=-10};
-    auto model1=IRLM {.L=len, .t=0.5, .V=0.0, .U=0.25, .ed=-10, .connected=false};
-    auto model2=IRLM {.L=len, .t=0.5, .V=0.1, .U=0.25, .ed=0.0};
+    if (argc>=5) U=atof(argv[4]);
+    auto model0=IRLM {.L=len, .t=0.5, .V=0.0, .U=U, .ed=-10};
+    auto model1=IRLM {.L=len, .t=0.5, .V=0.0, .U=U, .ed=-10, .connected=false};
+    auto model2=IRLM {.L=len, .t=0.5, .V=0.1, .U=U, .ed=0.0};
 
     cout<<"\n-------------------------- find the gs1 ----------------\n";
 
@@ -57,7 +59,8 @@ int main(int argc, char **argv)
     it_tdvp sol {sys2, sol_gs.psi};
     sol.dt={0,dt};
     sol.bond_dim=1024;
-    sol.rho_cutoff=1e-14;
+    sol.rho_cutoff=1e-12;
+    sol.epsilonM=0; //1e-10;
     sol.silent=true;
     sol.enrichByFit = false;
     ofstream out("irlm_star_L"s+to_string(sol.hamsys.ham.length())+".txt");
@@ -72,9 +75,9 @@ int main(int argc, char **argv)
     double cd=itensor::innerC(sol.psi, cdOp(sol.hamsys.sites), sol.psi).real();
     out<<"0 "<< maxLinkDim(sys2.ham)<<" "<<maxLinkDim(sol.psi)<<" "<<sol.energy<<" "<<n0<<" "<<cd<<endl;
     for(auto i=0; i*dt<=len; i++) {
-        sol.epsilonM=(i%1==0) ? 1e-7 : 0;
+        // sol.epsilonM=(i%1==0) ? 1e-7 : 0;
         sol.iterate();
-        if (i%100==0) {
+        if (false && i%100==0) {
             auto cc=Fermionic::cc_matrix(sol.psi, sol.hamsys.sites);
             string filename="eval_L"s+to_string(sol.hamsys.ham.length())+"_t"+to_string(i)+".txt";
             arma::eig_sym(cc).save(filename,arma::raw_ascii);
